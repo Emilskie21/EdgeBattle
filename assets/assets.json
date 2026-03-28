@@ -1,0 +1,15 @@
+{
+  "menu_background": "menu.png",
+  "game_background": "gamebg.gif",
+  "health": {
+    "3": "hp_3.png",
+    "2": "hp_2.png",
+    "1": "hp_1.png"
+  },
+  "arrow": "arrownijoseph.png",
+  "punch": "pnchplaceholder.png",
+  "sprites_firstperson": {
+    "left": "sprites/fp_left.png",
+    "right": "sprites/fp_right.png"
+  }
+}
