@@ -13,3 +13,5 @@ build/
 *.log
 .idea/
 .vscode/
+# Large downloaded model (re-fetch via app or copy into assets/models)
+assets/models/*.task
