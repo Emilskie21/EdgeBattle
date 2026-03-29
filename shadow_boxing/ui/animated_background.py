@@ -54,7 +54,8 @@ class GifBackground:
         for frame in ImageSequence.Iterator(im):
             rgba = frame.convert("RGBA")
             data = rgba.tobytes()
-            surf = pygame.image.frombytes(rgba.size, data, "RGBA").convert_alpha()
+            # surf = pygame.image.frombytes(rgba.size, data, "RGBA").convert_alpha()
+            surf = pygame.image.frombytes(data, rgba.size, "RGBA").convert_alpha()
             self._frames.append(
                 pygame.transform.smoothscale(surf, (SCREEN_WIDTH, SCREEN_HEIGHT))
             )
