@@ -134,14 +134,19 @@ class UIRenderer:
         else:
             self._draw_minecraft_hearts_row(stats.hp, pad_x, y)
 
+        # hi = self.small_font.render(f"HIGH  {high_score:06d}", True, self.accent)
+        # self.screen.blit(hi, (SCREEN_WIDTH - hi.get_width() - pad_x, y))
+
+        # sc = self.small_font.render(f"SCORE  {stats.score:06d}", True, self.muted)
+        # self.screen.blit(sc, (pad_x, y + 36))
+
         hi = self.small_font.render(f"HIGH  {high_score:06d}", True, self.accent)
-        self.screen.blit(hi, (SCREEN_WIDTH - hi.get_width() - pad_x, y))
+        hi_pos = (SCREEN_WIDTH - hi.get_width() - pad_x, y)
+        self.screen.blit(hi, hi_pos)
 
         sc = self.small_font.render(f"SCORE  {stats.score:06d}", True, self.muted)
-        self.screen.blit(sc, (pad_x, y + 36))
-
-        settings_s = self.small_font.render("SETTINGS  [O]", True, self.white)
-        self.screen.blit(settings_s, settings_s.get_rect(center=(SCREEN_WIDTH // 2, y + 14)))
+        sc_pos = (SCREEN_WIDTH - sc.get_width() - pad_x, y + 28)
+        self.screen.blit(sc, sc_pos)
 
     def _draw_fp_sprites(self) -> None:
         bottom = SCREEN_HEIGHT - FP_SPRITE_BOTTOM_PAD
