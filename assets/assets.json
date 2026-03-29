@@ -2,9 +2,10 @@
   "menu_background": "menu.png",
   "game_background": "gamebg.gif",
   "health": {
-    "3": "hp_3.png",
-    "2": "hp_2.png",
-    "1": "hp_1.png"
+    "3": "health_bar3.png",
+    "2": "health_bar2.png",
+    "1": "health_bar1.png",
+    "0": "health_bar0.png"
   },
   "arrow": "arrownijoseph.png",
   "punch": "pnchplaceholder.png",
