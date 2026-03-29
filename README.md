@@ -1,3 +1,5 @@
+Dear Lumakin Luke, You're a bitchass hoe.
+
 hoy monggoloyd curien eto run mo:
 
 python -m venv .venv
@@ -10,3 +12,4 @@ so far, ang progress namin yung stitching ng bg assets and nung game logic medyo
 
  btw run mo na lang yung:
  python main.py file andyan na lahat
+
