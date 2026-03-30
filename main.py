@@ -24,7 +24,7 @@ def main() -> None:
             print("Calibration did not finish. Run again when ready.")
             sys.exit(1)
 
-    from shadow_boxing.gameplay.game_app import ShadowBoxingGame
+    from game.gameplay.game_app import ShadowBoxingGame
 
     ShadowBoxingGame().run()
 

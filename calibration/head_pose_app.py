@@ -11,7 +11,7 @@ import cv2
 import mediapipe as mp
 import numpy as np
 
-from shadow_boxing.paths import repo_root
+from game.paths import repo_root
 
 
 @dataclass

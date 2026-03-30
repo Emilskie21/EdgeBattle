@@ -1,1 +1,0 @@
-"""Shadow Boxing game package."""

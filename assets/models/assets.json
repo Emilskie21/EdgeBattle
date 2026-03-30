@@ -1,0 +1,14 @@
+{
+  "menu_background": "background/menu.png",
+  "game_background": "background/gamebg.gif",
+  "health": {
+    "3": "health/health_bar3.png",
+    "2": "health/health_bar2.png",
+    "1": "health/health_bar1.png"
+  },
+  "arrow": "models/Long arrow.png",
+  "sprites_firstperson": {
+    "left": "sprites/fp_left.png",
+    "right": "sprites/fp_right.png"
+  }
+}
