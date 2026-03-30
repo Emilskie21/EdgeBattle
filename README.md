@@ -1,3 +1,8 @@
+game_app.py line 253, speed of arrow fade 0.05, higher number means higher difficulty, 0.0 means fading speed is usual throughout
+
+renderer.py line 392 393, width and height of edgar
+
+
 Dear Lumakin Luke, You're a bitchass hoe.
 
 hoy monggoloyd curien eto run mo:

@@ -250,7 +250,7 @@ class ShadowBoxingGame:
         now = pygame.time.get_ticks()
         self.current_arrow = random.choice(list(Direction))
         self.arrow_start_ms = now
-        speed = max(350, ARROW_DISPLAY_MS - self.stats.score * 1)
+        speed = max(450, ARROW_DISPLAY_MS - self.stats.score * 0.05)
         self.arrow_deadline_ms = now + speed
         self._dodge_head_moved = False
 
