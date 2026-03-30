@@ -72,6 +72,12 @@ class ShadowBoxingGame:
         self._game_over_since_ms: int = 0
         self._game_over_name_input: str = ""
         self._game_over_name_saved: bool = False
+        self._game_over_phase: int = 1  # 1=name entry, 2=leaderboard view
+        self._game_over_row_id: int = 0
+        self._game_over_rank: int = 0
+        self._game_over_total: int = 0
+        self._game_over_scores: list[dict[str, str | int]] = []
+        self._leaderboard_scroll_y: float = 0.0
 
     def run(self) -> None:
         while self.running:
@@ -88,6 +94,17 @@ class ShadowBoxingGame:
             if event.type == pygame.QUIT:
                 self.running = False
                 return
+
+            # Text entry for name: use TEXTINPUT for reliability.
+            if self.state_machine.state == GameState.GAME_OVER and event.type == pygame.TEXTINPUT:
+                if self._game_over_phase == 1 and not self._game_over_name_saved:
+                    text = getattr(event, "text", "") or ""
+                    for ch in text:
+                        if len(self._game_over_name_input) >= 16:
+                            break
+                        if ch.isprintable() and ch not in ("\r", "\n", "\t"):
+                            self._game_over_name_input += ch
+                continue
 
             if event.type != pygame.KEYDOWN:
                 continue
@@ -163,21 +180,36 @@ class ShadowBoxingGame:
             return
 
     def _handle_game_over_input(self, key_name: str, event_unicode: str) -> None:
-        if key_name == "m":
-            self.state_machine.transition_to(GameState.MENU)
-            return
-        if key_name == "escape":
-            self.state_machine.transition_to(GameState.MENU)
-            return
-
         if key_name == "backspace":
-            self._game_over_name_input = self._game_over_name_input[:-1]
-            self._game_over_name_saved = False
+            if self._game_over_phase == 1 and not self._game_over_name_saved:
+                self._game_over_name_input = self._game_over_name_input[:-1]
             return
 
         if key_name == "return":
-            if self._game_over_name_saved:
+            # Phase 2: Another try -> calibration + countdown.
+            if self._game_over_phase == 2:
+                self._run_calibration()
+                self.state_machine.state = GameState.COUNTDOWN
+                self._countdown_start_ms = pygame.time.get_ticks()
+                self._countdown_value = 3
+                self._game_over_name_input = ""
+                self._game_over_name_saved = False
+                self._game_over_phase = 1
+                self._game_over_row_id = 0
+                self._game_over_rank = 0
+                self._game_over_total = 0
+                self._game_over_scores = []
+                self._leaderboard_scroll_y = 0.0
+                self.current_arrow = None
+                self.arrow_start_ms = 0
+                self.arrow_deadline_ms = 0
                 return
+
+            # Phase 1: save name then go to leaderboard phase.
+            if self._game_over_name_saved:
+                self._game_over_phase = 2
+                return
+
             name = self._game_over_name_input.strip()
             if not name:
                 name = "Anonymous"
@@ -187,15 +219,27 @@ class ShadowBoxingGame:
                 score=self.stats.score,
                 timestamp=now_manila(),
             )
-            self.leaderboard_db.insert_score(entry)
+            row_id = self.leaderboard_db.insert_score(entry)
+            self._game_over_row_id = row_id
             self._game_over_name_saved = True
-            return
+            self._game_over_phase = 2
 
-        # Normal character input.
-        if event_unicode and len(event_unicode) == 1 and len(self._game_over_name_input) < 16:
-            # Filter out control chars.
-            if event_unicode.isprintable() and event_unicode not in ("\r", "\n", "\t"):
-                self._game_over_name_input += event_unicode
+            self._game_over_total = self.leaderboard_db.fetch_total_count()
+            self._game_over_rank = self.leaderboard_db.fetch_rank_for_id(row_id)
+            rows = self.leaderboard_db.fetch_scores(limit=80)
+            scores: list[dict[str, str | int]] = []
+            for i, r in enumerate(rows, start=1):
+                scores.append(
+                    {
+                        "rank": int(i),
+                        "name": str(r["name"]),
+                        "score": int(r["score"]),
+                        "id": int(r["id"]),
+                    }
+                )
+            self._game_over_scores = scores
+            self._leaderboard_scroll_y = 0.0
+            return
 
     def _handle_playing_input(self, key_name: str) -> None:
         if key_name == "o":
@@ -230,6 +274,9 @@ class ShadowBoxingGame:
             return
 
         if state != GameState.PLAYING:
+            if state == GameState.GAME_OVER and self._game_over_phase == 2:
+                # Scroll leaderboard slowly.
+                self._leaderboard_scroll_y += float(dt_seconds) * 28.0
             return
 
         if self.punch_flash_until_ms > now:
@@ -295,6 +342,16 @@ class ShadowBoxingGame:
         self._game_over_since_ms = 0
         self._game_over_name_input = ""
         self._game_over_name_saved = False
+        self._game_over_phase = 1
+        self._game_over_row_id = 0
+        self._game_over_rank = 0
+        self._game_over_total = 0
+        self._game_over_scores = []
+        self._leaderboard_scroll_y = 0.0
+        try:
+            pygame.key.stop_text_input()
+        except Exception:
+            pass
         self.current_arrow = None
         self.arrow_start_ms = 0
         self.arrow_deadline_ms = 0
@@ -308,6 +365,16 @@ class ShadowBoxingGame:
         self._game_over_since_ms = pygame.time.get_ticks()
         self._game_over_name_input = ""
         self._game_over_name_saved = False
+        self._game_over_phase = 1
+        self._game_over_row_id = 0
+        self._game_over_rank = 0
+        self._game_over_total = 0
+        self._game_over_scores = []
+        self._leaderboard_scroll_y = 0.0
+        try:
+            pygame.key.start_text_input()
+        except Exception:
+            pass
         self.state_machine.transition_to(GameState.GAME_OVER)
 
     def _render(self) -> None:
@@ -331,6 +398,12 @@ class ShadowBoxingGame:
             game_over_name_input=self._game_over_name_input,
             game_over_name_saved=self._game_over_name_saved,
             game_over_since_ms=self._game_over_since_ms,
+            game_over_phase=self._game_over_phase,
+            game_over_rank=self._game_over_rank,
+            game_over_total=self._game_over_total,
+            game_over_scores=self._game_over_scores,
+            leaderboard_scroll_y=self._leaderboard_scroll_y,
+            game_over_row_id=self._game_over_row_id,
             show_debug=self.show_debug,
             debug_lines=debug_lines,
         )

@@ -26,11 +26,15 @@ class UIRenderer:
         font_path = repo_root() / "assets" / "font" / "DiaryOfAn8BitMage-lYDD.ttf"
         if font_path.is_file():
             self.pixel_font = pygame.font.Font(str(font_path), 28)
-            self.small_font = pygame.font.Font(str(font_path), 18)
+            self.header_font = pygame.font.Font(str(font_path), 56)
+            self.countdown_font = pygame.font.Font(str(font_path), 140)
+            self.small_font = pygame.font.Font(str(font_path), 22)
             self.tiny_font = pygame.font.Font(str(font_path), 16)
         else:
             self.pixel_font = pygame.font.SysFont("consolas", 28, bold=True)
-            self.small_font = pygame.font.SysFont("consolas", 18)
+            self.header_font = pygame.font.SysFont("consolas", 56, bold=True)
+            self.countdown_font = pygame.font.SysFont("consolas", 140, bold=True)
+            self.small_font = pygame.font.SysFont("consolas", 22)
             self.tiny_font = pygame.font.SysFont("consolas", 16)
         self.accent = (247, 199, 56)
         self.white = (238, 238, 238)
@@ -78,6 +82,12 @@ class UIRenderer:
         game_over_name_input: str = "",
         game_over_name_saved: bool = False,
         game_over_since_ms: int = 0,
+        game_over_phase: int = 1,
+        game_over_rank: int = 0,
+        game_over_total: int = 0,
+        game_over_scores: list[dict[str, str | int]] | None = None,
+        leaderboard_scroll_y: float = 0.0,
+        game_over_row_id: int = 0,
         show_debug: bool = False,
         debug_lines: list[str] | None = None,
     ) -> None:
@@ -116,6 +126,12 @@ class UIRenderer:
                 game_over_name_input=game_over_name_input,
                 game_over_name_saved=game_over_name_saved,
                 game_over_since_ms=game_over_since_ms,
+                game_over_phase=game_over_phase,
+                game_over_rank=game_over_rank,
+                game_over_total=game_over_total,
+                game_over_scores=game_over_scores or [],
+                leaderboard_scroll_y=leaderboard_scroll_y,
+                game_over_row_id=game_over_row_id,
             )
 
         if show_debug:
@@ -158,9 +174,11 @@ class UIRenderer:
         # sc = self.small_font.render(f"SCORE  {stats.score:06d}", True, self.muted)
         # self.screen.blit(sc, (pad_x, y + 36))
 
-        sc = self.small_font.render(f"SCORE  {stats.score:06d}", True, self.muted)
-        sc_pos = (SCREEN_WIDTH - sc.get_width() - pad_x, y)
-        self.screen.blit(sc, sc_pos)
+        hi = self.small_font.render(f"HIGH  {high_score:06d}", True, self.white)
+        self.screen.blit(hi, (SCREEN_WIDTH - hi.get_width() - pad_x, y))
+
+        sc = self.small_font.render(f"SCORE  {stats.score:06d}", True, self.accent)
+        self.screen.blit(sc, (SCREEN_WIDTH - sc.get_width() - pad_x, y + 26))
 
     def _draw_fp_sprites(self) -> None:
         bottom = SCREEN_HEIGHT - FP_SPRITE_BOTTOM_PAD
@@ -206,23 +224,20 @@ class UIRenderer:
         cy = int(SCREEN_HEIGHT * ARROW_CENTER_Y_RATIO)
         rect = arr.get_rect(center=(cx, cy))
 
-        # Inline border/highlight drawn onto the arrow image surface.
+        # Inline outline stroke that follows the arrow sprite (no box).
         if pressure > 0.02:
-            pad = int(2 + 6 * pressure)
-            bw = max(2, int(2 + 5 * pressure))
-            radius = min(10, 4 + int(6 * pressure))
-            w = max(1, arr.get_width() - 2 * pad)
-            h = max(1, arr.get_height() - 2 * pad)
-            border_rect = pygame.Rect(pad, pad, w, h)
-            pygame.draw.rect(arr, (255, 72, 48), border_rect, width=bw, border_radius=radius)
+            try:
+                mask = pygame.mask.from_surface(arr)
+                outline = mask.outline()
+            except Exception:
+                outline = []
 
-        if pressure > 0.06:
-            inner_pad = int(3 + 7 * pressure)
-            iw = max(1, int(1 + 2 * pressure))
-            w = max(1, arr.get_width() - 2 * inner_pad)
-            h = max(1, arr.get_height() - 2 * inner_pad)
-            inner_rect = pygame.Rect(inner_pad, inner_pad, w, h)
-            pygame.draw.rect(arr, (255, 210, 120), inner_rect, width=iw, border_radius=4)
+            if outline:
+                w1 = max(1, int(1 + 3 * pressure))
+                w2 = max(1, int(1 + 2 * pressure))
+                pygame.draw.lines(arr, (255, 72, 48), True, outline, width=w1)
+                if pressure > 0.12:
+                    pygame.draw.lines(arr, (255, 210, 120), True, outline, width=w2)
 
         self.screen.blit(arr, rect)
 
@@ -251,7 +266,9 @@ class UIRenderer:
         if countdown_value is None or countdown_value <= 0:
             return
         color = self.accent if countdown_value == 3 else self.white
-        self._draw_text_center(str(countdown_value), int(SCREEN_HEIGHT * 0.42), self.pixel_font, color)
+        surface = self.countdown_font.render(str(countdown_value), True, color)
+        rect = surface.get_rect(center=(SCREEN_WIDTH // 2, int(SCREEN_HEIGHT * 0.40)))
+        self.screen.blit(surface, rect)
 
     def _draw_game_over_screen(
         self,
@@ -259,14 +276,21 @@ class UIRenderer:
         game_over_name_input: str,
         game_over_name_saved: bool,
         game_over_since_ms: int,
+        game_over_phase: int,
+        game_over_rank: int,
+        game_over_total: int,
+        game_over_scores: list[dict[str, str | int]],
+        leaderboard_scroll_y: float,
+        game_over_row_id: int,
     ) -> None:
         # Animated black filter overlay (sits on top of the GIF background).
         now = pygame.time.get_ticks()
         elapsed_ms = max(0, now - game_over_since_ms)
-        # Flicker faster near the end to make the filter feel alive.
+        # Slow fade-in tint (no harsh flicker).
         t = elapsed_ms / 1000.0
-        pulse = 0.5 + 0.5 * math.sin(t * 5.5)
-        alpha = int(110 + 90 * pulse)
+        ramp = max(0.0, min(1.0, t / 2.6))
+        pulse = 0.5 + 0.5 * math.sin(t * 0.9)
+        alpha = int((40 + 140 * ramp) * (0.92 + 0.08 * pulse))
 
         overlay = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
         overlay.fill((0, 0, 0, alpha))
@@ -274,20 +298,75 @@ class UIRenderer:
 
         header = "CONGRATULATIONS" if stats_score >= 1000 else "GAME OVER"
         header_color = self.accent if stats_score >= 1000 else self.hp_bad
-        self._draw_text_center(header, int(SCREEN_HEIGHT * 0.36), self.pixel_font, header_color)
-        self._draw_text_center(f"SCORE: {stats_score}", int(SCREEN_HEIGHT * 0.52), self.small_font, self.white)
+        self._draw_text_center(header, int(SCREEN_HEIGHT * 0.30), self.header_font, header_color)
+        self._draw_text_center(f"SCORE: {stats_score}", int(SCREEN_HEIGHT * 0.48), self.small_font, self.white)
 
-        # Name prompt for leaderboard storage.
-        shown_name = game_over_name_input if game_over_name_input else ""
-        self._draw_text_center(
-            f"ENTER NAME (PRESS ENTER): {shown_name}",
-            int(SCREEN_HEIGHT * 0.66),
-            self.small_font,
-            self.muted,
-        )
+        if game_over_phase == 1:
+            shown_name = game_over_name_input if game_over_name_input else ""
+            self._draw_text_center(
+                f"ENTER NAME (PRESS ENTER): {shown_name}",
+                int(SCREEN_HEIGHT * 0.64),
+                self.small_font,
+                self.muted,
+            )
+        else:
+            placed = f"You placed {game_over_rank} out of {game_over_total} completionists"
+            self._draw_text_center(placed, int(SCREEN_HEIGHT * 0.56), self.small_font, self.white)
 
-        # Return option.
-        self._draw_text_center("PRESS M TO RETURN", int(SCREEN_HEIGHT * 0.78), self.small_font, self.white)
+            # Layout band where your row + running list live (centered horizontally).
+            start_y = int(SCREEN_HEIGHT * 0.64)
+            view_h = int(SCREEN_HEIGHT * 0.20)
+            line_h = 18
+            x_center = SCREEN_WIDTH // 2
+            # Column anchors (shared by your row and rolling list).
+            left_rank_x = x_center - 260
+            left_name_x = x_center - 230
+            left_score_right_x = x_center - 20
+            right_rank_x = x_center + 20
+            right_name_x = x_center + 50
+            right_score_right_x = x_center + 260
+
+            # Your row pinned on the left, at the top of that band.
+            your = None
+            for r in game_over_scores:
+                if int(r.get("id", 0)) == int(game_over_row_id):
+                    your = r
+                    break
+            if your:
+                rnk = int(your.get("rank", 0))
+                name = str(your.get("name", ""))[:16]
+                score = int(your.get("score", 0))
+                y0 = start_y - line_h - 2
+                rank_s = self.tiny_font.render(str(rnk), True, self.accent)
+                name_s = self.tiny_font.render(name, True, self.accent)
+                score_s = self.tiny_font.render(str(score), True, self.accent)
+                self.screen.blit(rank_s, (left_rank_x, y0))
+                self.screen.blit(name_s, (left_name_x, y0))
+                self.screen.blit(score_s, (left_score_right_x - score_s.get_width(), y0))
+
+            # Rolling list: rank, name, score on the right, vertically constrained above "Another try".
+            clip = pygame.Rect(0, start_y - 4, SCREEN_WIDTH, view_h + 8)
+            prev_clip = self.screen.get_clip()
+            self.screen.set_clip(clip)
+            total_h = max(1, (len(game_over_scores) * line_h))
+            base_y = start_y - (int(leaderboard_scroll_y) % total_h)
+            for idx, row in enumerate(game_over_scores):
+                y = base_y + idx * line_h
+                if y < start_y - line_h or y > start_y + view_h:
+                    continue
+                r = int(row.get("rank", 0))
+                name = str(row.get("name", ""))[:16]
+                score = int(row.get("score", 0))
+                color = self.accent if int(row.get("id", 0)) == int(game_over_row_id) else self.muted
+                rank_s = self.tiny_font.render(str(r), True, color)
+                name_s = self.tiny_font.render(name, True, color)
+                score_s = self.tiny_font.render(str(score), True, color)
+                self.screen.blit(rank_s, (right_rank_x, y))
+                self.screen.blit(name_s, (right_name_x, y))
+                self.screen.blit(score_s, (right_score_right_x - score_s.get_width(), y))
+            self.screen.set_clip(prev_clip)
+
+            self._draw_text_center("Another try? (ENTER)", int(SCREEN_HEIGHT * 0.90), self.small_font, self.white)
 
     def _draw_debug(self, debug_lines: list[str]) -> None:
         y = SCREEN_HEIGHT - 28 - 18 * len(debug_lines)

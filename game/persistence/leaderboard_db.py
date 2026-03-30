@@ -43,14 +43,51 @@ class LeaderboardDB:
             )
             conn.commit()
 
-    def insert_score(self, entry: ScoreEntry) -> None:
+    def insert_score(self, entry: ScoreEntry) -> int:
         ts = entry.timestamp.isoformat()
         with self._connect() as conn:
-            conn.execute(
+            cur = conn.execute(
                 "INSERT INTO scores (name, hp_remaining, score, timestamp) VALUES (?, ?, ?, ?)",
                 (entry.name, entry.hp_remaining, entry.score, ts),
             )
             conn.commit()
+            return int(cur.lastrowid or 0)
+
+    def fetch_scores(self, limit: int = 50) -> list[sqlite3.Row]:
+        with self._connect() as conn:
+            cur = conn.execute(
+                """
+                SELECT id, name, hp_remaining, score, timestamp
+                FROM scores
+                ORDER BY score DESC, timestamp ASC, id ASC
+                LIMIT ?
+                """,
+                (int(limit),),
+            )
+            return list(cur.fetchall())
+
+    def fetch_total_count(self) -> int:
+        with self._connect() as conn:
+            cur = conn.execute("SELECT COUNT(*) AS c FROM scores")
+            row = cur.fetchone()
+            return int(row["c"] if row else 0)
+
+    def fetch_rank_for_id(self, row_id: int) -> int:
+        if row_id <= 0:
+            return 0
+        with self._connect() as conn:
+            cur = conn.execute(
+                """
+                SELECT id
+                FROM scores
+                ORDER BY score DESC, timestamp ASC, id ASC
+                """,
+            )
+            ids = [int(r["id"]) for r in cur.fetchall()]
+        try:
+            return ids.index(int(row_id)) + 1
+        except ValueError:
+            return 0
 
 
 def now_manila() -> datetime:
