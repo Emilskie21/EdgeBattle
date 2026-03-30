@@ -41,6 +41,10 @@ class UIRenderer:
         self.muted = (120, 118, 140)
         self.hp_bad = (220, 64, 64)
         pack = game_assets.load_packaged_surfaces()
+
+        self._edgar_sprites = pack.get("sprites_edgar") or {}
+        self._edgar_current: BackgroundDrawable | None = self._edgar_sprites.get("idle")
+
         self._menu_static = pack.get("menu_static")
         self._game_bg: BackgroundDrawable | None = pack.get("game_bg")
         ab = pack.get("arrow_base")
@@ -112,6 +116,7 @@ class UIRenderer:
         elif game_state == GameState.COUNTDOWN:
             self._draw_countdown(countdown_value)
         elif game_state == GameState.PLAYING:
+            self._draw_edgar(dt_ms)
             self._draw_hud(stats, high_score)
             self._draw_fp_sprites()
             self._draw_arrow_prompt(
@@ -374,3 +379,50 @@ class UIRenderer:
             surface = self.tiny_font.render(line, True, (90, 180, 140))
             self.screen.blit(surface, (12, y))
             y += 18
+
+    def _draw_edgar(self, dt_ms: float) -> None:
+        if not self._edgar_current:
+            return
+
+        self._edgar_current.update(dt_ms)
+
+        # draw to temp surface
+        temp = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
+        self._edgar_current.draw(temp)
+        w = int(temp.get_width() * 0.50)
+        h = int(temp.get_height() * 0.70)
+        scaled = pygame.transform.smoothscale(temp, (w, h))
+
+        rect = scaled.get_rect(midbottom=(SCREEN_WIDTH // 2, SCREEN_HEIGHT))
+        self.screen.blit(scaled, rect)
+
+    def set_edgar_anim(self, name: str, once: bool = False) -> None:
+        anim = self._edgar_sprites.get(name)
+        if not anim:
+            return
+
+        self._edgar_current = anim
+
+        try:
+            anim._play_once = once
+            anim.reset()
+        except AttributeError:
+            pass
+
+        if once:
+            try:
+                anim.set_on_finish(lambda: self.set_edgar_anim("idle"))
+            except AttributeError:
+                pass
+    
+    def play_edgar_for_direction(self, direction: Direction) -> None:
+        mapping = {
+            Direction.RIGHT: "left_hook",
+            Direction.LEFT: "right_hook",
+            Direction.UP: "uppercut",
+            Direction.DOWN: "jab",
+        }
+
+        name = mapping.get(direction)
+        if name:
+            self.set_edgar_anim(name, once=True)

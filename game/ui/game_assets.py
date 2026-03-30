@@ -31,6 +31,7 @@ def load_packaged_surfaces() -> dict[str, Any]:
         "punch": None,
         "hp_by_value": {},
         "sprites_fp": {},
+        "sprites_edgar": {},
     }
     if not m:
         return out
@@ -71,6 +72,14 @@ def load_packaged_surfaces() -> dict[str, Any]:
                 surf = _load_raster(resolve_asset(rel))
                 if surf is not None:
                     out["sprites_fp"][side] = surf
+    edgar = m.get("edgar")
+    if isinstance(edgar, dict):
+        for move in ("idle", "jab", "left_hook", "right_hook", "uppercut"):
+            rel = edgar.get(move)
+            if isinstance(rel, str):
+                surf = load_background_from_path(resolve_asset(rel))
+                if surf is not None:
+                    out["sprites_edgar"][move] = surf
 
     return out
 

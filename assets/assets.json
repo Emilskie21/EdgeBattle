@@ -10,5 +10,12 @@
   "sprites_firstperson": {
     "left": "sprites/fp_left.png",
     "right": "sprites/fp_right.png"
+  },
+  "edgar": {
+    "idle": "sprites/idle.gif",
+    "jab": "sprites/jab.gif",
+    "left_hook": "sprites/left hook.gif",
+    "right_hook": "sprites/right hook.gif",
+    "uppercut": "sprites/uppercut.gif"
   }
 }

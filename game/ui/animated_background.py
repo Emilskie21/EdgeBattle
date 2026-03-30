@@ -25,20 +25,25 @@ class StaticBackground:
         screen.blit(self._surf, (0, 0))
 
 class GifBackground:
-    def __init__(self, path: Path) -> None:
+    def __init__(self, path: Path, play_once: bool = False) -> None:
         from PIL import Image, ImageSequence
 
         self._frames: list[pygame.Surface] = []
         self._durations_ms: list[int] = []
+
+        self._play_once = play_once
+        self._finished = False
+        self._on_finish = None
+
         im = Image.open(path)
         for frame in ImageSequence.Iterator(im):
             rgba = frame.convert("RGBA")
             data = rgba.tobytes()
-            # surf = pygame.image.frombytes(rgba.size, data, "RGBA").convert_alpha()
             surf = pygame.image.frombytes(data, rgba.size, "RGBA").convert_alpha()
             self._frames.append(
                 pygame.transform.smoothscale(surf, (SCREEN_WIDTH, SCREEN_HEIGHT))
             )
+
             finfo = getattr(frame, "info", {}) or {}
             dur = finfo.get("duration")
             if dur is None:
@@ -46,24 +51,52 @@ class GifBackground:
             if dur is None:
                 dur = 100
             self._durations_ms.append(max(1, int(dur)))
+
         if not self._frames:
             raise ValueError("empty gif")
+
         self._idx = 0
         self._elapsed = 0.0
 
     def update(self, dt_ms: float) -> None:
-        if not self._frames:
+        if not self._frames or self._finished:
             return
+
         self._elapsed += dt_ms
         d = float(self._durations_ms[self._idx])
+
         while self._elapsed >= d:
             self._elapsed -= d
-            self._idx = (self._idx + 1) % len(self._frames)
+
+            if self._idx == len(self._frames) - 1:
+                if self._play_once:
+                    self._finished = True
+                    if self._on_finish:
+                        self._on_finish()
+                    return
+                else:
+                    self._idx = 0
+            else:
+                self._idx += 1
+
             d = float(self._durations_ms[self._idx])
 
     def draw(self, screen: pygame.Surface) -> None:
         if self._frames:
             screen.blit(self._frames[self._idx], (0, 0))
+
+    def reset(self) -> None:
+        self._idx = 0
+        self._elapsed = 0.0
+        self._finished = False
+
+
+    def set_on_finish(self, fn) -> None:
+        self._on_finish = fn
+
+
+    def finished(self) -> bool:
+        return self._finished
 
 
 def load_background_from_path(path: Path) -> BackgroundDrawable | None:

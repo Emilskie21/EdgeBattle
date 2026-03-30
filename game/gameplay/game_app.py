@@ -58,6 +58,7 @@ class ShadowBoxingGame:
         self.pose_visual_dir: Optional[Direction] = None
 
         self.current_arrow: Optional[Direction] = None
+        self.previous_arrow: Optional[Direction] = None
         self.arrow_start_ms: int = 0
         self.arrow_deadline_ms: int = 0
         self.punch_flash_until_ms: int = 0
@@ -249,8 +250,12 @@ class ShadowBoxingGame:
         now = pygame.time.get_ticks()
         self.current_arrow = random.choice(list(Direction))
         self.arrow_start_ms = now
-        self.arrow_deadline_ms = now + ARROW_DISPLAY_MS
+        speed = max(350, ARROW_DISPLAY_MS - self.stats.score * 1)
+        self.arrow_deadline_ms = now + speed
         self._dodge_head_moved = False
+
+        self.ui.play_edgar_for_direction(self.previous_arrow)
+        self.previous_arrow = self.current_arrow
 
     def _update(self, dt_seconds: float) -> None:
         _ = dt_seconds
