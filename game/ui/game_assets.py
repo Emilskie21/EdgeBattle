@@ -7,8 +7,8 @@ from typing import Any
 
 import pygame
 
-from game.constants import SCREEN_HEIGHT, SCREEN_WIDTH
-from game.ui.animated_background import load_background_from_path
+from game.constants import FP_SPRITE_MAX_HEIGHT_RATIO, SCREEN_HEIGHT, SCREEN_WIDTH
+from game.ui.animated_background import load_background_from_path, load_sprite_gif
 from game.ui.assets_manifest import load_manifest, resolve_asset
 
 
@@ -74,12 +74,13 @@ def load_packaged_surfaces() -> dict[str, Any]:
                     out["sprites_fp"][side] = surf
     edgar = m.get("edgar")
     if isinstance(edgar, dict):
+        target_h = int(SCREEN_HEIGHT * FP_SPRITE_MAX_HEIGHT_RATIO)
         for move in ("idle", "jab", "left_hook", "right_hook", "uppercut"):
             rel = edgar.get(move)
             if isinstance(rel, str):
-                surf = load_background_from_path(resolve_asset(rel))
-                if surf is not None:
-                    out["sprites_edgar"][move] = surf
+                anim = load_sprite_gif(resolve_asset(rel), target_h=target_h)
+                if anim is not None:
+                    out["sprites_edgar"][move] = anim
 
     return out
 

@@ -371,7 +371,11 @@ class UIRenderer:
                 self.screen.blit(score_s, (right_score_right_x - score_s.get_width(), y))
             self.screen.set_clip(prev_clip)
 
-            self._draw_text_center("Another try? (ENTER)", int(SCREEN_HEIGHT * 0.90), self.small_font, self.white)
+            # End-screen controls (no restart-to-menu; no calibration screen here).
+            self._draw_text_center("PRESS 1: ANOTHER TRY", int(SCREEN_HEIGHT * 0.88), self.small_font, self.white)
+            self._draw_text_center(
+                "PRESS 2: ANOTHER PLAYER", int(SCREEN_HEIGHT * 0.92), self.small_font, self.accent
+            )
 
     def _draw_debug(self, debug_lines: list[str]) -> None:
         y = SCREEN_HEIGHT - 28 - 18 * len(debug_lines)
@@ -386,15 +390,28 @@ class UIRenderer:
 
         self._edgar_current.update(dt_ms)
 
-        # draw to temp surface
-        temp = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
-        self._edgar_current.draw(temp)
-        w = int(temp.get_width() * 0.50)
-        h = int(temp.get_height() * 0.70)
-        scaled = pygame.transform.smoothscale(temp, (w, h))
+       
+        frame_fn = getattr(self._edgar_current, "current_frame", None)
+        if callable(frame_fn):
+            frame = frame_fn()
+        else:
+            
+            tmp = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
+            self._edgar_current.draw(tmp)
+            frame = tmp
 
-        rect = scaled.get_rect(midbottom=(SCREEN_WIDTH // 2, SCREEN_HEIGHT))
-        self.screen.blit(scaled, rect)
+        fw, fh = frame.get_size()
+        if fw <= 1 or fh <= 1:
+            return
+
+        
+        visible_ratio = 0.80
+        visible_h = max(1, int(fh * visible_ratio))
+        crop_rect = pygame.Rect(0, 0, fw, visible_h)
+
+        dest_x = (SCREEN_WIDTH - fw) // 2
+        dest_y = SCREEN_HEIGHT - FP_SPRITE_BOTTOM_PAD - visible_h
+        self.screen.blit(frame, (dest_x, dest_y), area=crop_rect)
 
     def set_edgar_anim(self, name: str, once: bool = False) -> None:
         anim = self._edgar_sprites.get(name)

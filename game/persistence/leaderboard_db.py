@@ -89,6 +89,12 @@ class LeaderboardDB:
         except ValueError:
             return 0
 
+    def reset(self) -> None:
+        """Clear all leaderboard rows (keeps schema intact)."""
+        with self._connect() as conn:
+            conn.execute("DELETE FROM scores")
+            conn.commit()
+
 
 def now_manila() -> datetime:
     # Manila is UTC+8 and does not observe DST.

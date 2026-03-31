@@ -44,6 +44,8 @@ class ShadowBoxingGame:
         self.state_machine.state = GameState.COUNTDOWN
         self.save_system = SaveSystem()
         self.leaderboard_db = LeaderboardDB()
+        # Reset leaderboard data at startup (fresh run).
+        self.leaderboard_db.reset()
         self.save_data = self.save_system.load()
 
         self.stats = PlayerStats(high_score=int(self.save_data.get("high_score", 0)))
@@ -181,6 +183,54 @@ class ShadowBoxingGame:
             return
 
     def _handle_game_over_input(self, key_name: str, event_unicode: str) -> None:
+        # Phase 2 (leaderboard): numeric options.
+        if self._game_over_phase == 2:
+            if key_name == "1":
+                # Another try: restart gameplay countdown (no re-calibration).
+                try:
+                    pygame.key.stop_text_input()
+                except Exception:
+                    pass
+                self.state_machine.state = GameState.COUNTDOWN
+                self._countdown_start_ms = pygame.time.get_ticks()
+                self._countdown_value = 3
+                self._game_over_phase = 1
+                self._game_over_name_input = ""
+                self._game_over_name_saved = False
+                self._game_over_row_id = 0
+                self._game_over_rank = 0
+                self._game_over_total = 0
+                self._game_over_scores = []
+                self._leaderboard_scroll_y = 0.0
+                self.current_arrow = None
+                self.punch_flash_until_ms = 0
+                self.arrow_start_ms = 0
+                self.arrow_deadline_ms = 0
+                return
+            if key_name == "2":
+                # Another player: re-calibrate, then restart countdown.
+                try:
+                    pygame.key.stop_text_input()
+                except Exception:
+                    pass
+                self._run_calibration()
+                self.state_machine.state = GameState.COUNTDOWN
+                self._countdown_start_ms = pygame.time.get_ticks()
+                self._countdown_value = 3
+                self._game_over_phase = 1
+                self._game_over_name_input = ""
+                self._game_over_name_saved = False
+                self._game_over_row_id = 0
+                self._game_over_rank = 0
+                self._game_over_total = 0
+                self._game_over_scores = []
+                self._leaderboard_scroll_y = 0.0
+                self.current_arrow = None
+                self.punch_flash_until_ms = 0
+                self.arrow_start_ms = 0
+                self.arrow_deadline_ms = 0
+                return
+
         if key_name == "backspace":
             if self._game_over_phase == 1 and not self._game_over_name_saved:
                 self._game_over_name_input = self._game_over_name_input[:-1]
@@ -189,21 +239,7 @@ class ShadowBoxingGame:
         if key_name == "return":
             # Phase 2: Another try -> calibration + countdown.
             if self._game_over_phase == 2:
-                self._run_calibration()
-                self.state_machine.state = GameState.COUNTDOWN
-                self._countdown_start_ms = pygame.time.get_ticks()
-                self._countdown_value = 3
-                self._game_over_name_input = ""
-                self._game_over_name_saved = False
-                self._game_over_phase = 1
-                self._game_over_row_id = 0
-                self._game_over_rank = 0
-                self._game_over_total = 0
-                self._game_over_scores = []
-                self._leaderboard_scroll_y = 0.0
-                self.current_arrow = None
-                self.arrow_start_ms = 0
-                self.arrow_deadline_ms = 0
+                # Phase 2 uses numeric keys (1/2) instead of ENTER.
                 return
 
             # Phase 1: save name then go to leaderboard phase.
@@ -253,8 +289,7 @@ class ShadowBoxingGame:
         speed = max(450, ARROW_DISPLAY_MS - self.stats.score * 0.05)
         self.arrow_deadline_ms = now + speed
         self._dodge_head_moved = False
-
-        self.ui.play_edgar_for_direction(self.previous_arrow)
+        # No robot punch here — punches are triggered only when a prompt is hit.
         self.previous_arrow = self.current_arrow
 
     def _update(self, dt_seconds: float) -> None:
@@ -315,7 +350,10 @@ class ShadowBoxingGame:
             self._dodge_head_moved = True
 
         if self.current_arrow is not None and gated is not None and gated == self.current_arrow:
+            prompt_dir = self.current_arrow
             self.combat.on_matched_shown_arrow(self.stats)
+            if prompt_dir is not None:
+                self.ui.play_edgar_for_direction(prompt_dir)
             self.punch_flash_until_ms = now + PUNCH_FLASH_MS
             self.current_arrow = None
             if self.stats.hp <= 0:
@@ -324,7 +362,10 @@ class ShadowBoxingGame:
 
         if self.current_arrow is not None and now >= self.arrow_deadline_ms:
             if not self._dodge_head_moved:
+                prompt_dir = self.current_arrow
                 self.combat.on_matched_shown_arrow(self.stats)
+                if prompt_dir is not None:
+                    self.ui.play_edgar_for_direction(prompt_dir)
                 self.punch_flash_until_ms = now + PUNCH_FLASH_MS
                 self.current_arrow = None
                 if self.stats.hp <= 0:
