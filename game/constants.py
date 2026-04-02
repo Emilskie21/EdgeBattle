@@ -29,6 +29,7 @@ class GameState(Enum):
     COUNTDOWN = auto()
     PLAYING = auto()
     GAME_OVER = auto()
+    INSTRUCTIONS = auto()
 
 
 class TurnState(Enum):

@@ -4,18 +4,38 @@
   "health": {
     "3": "health/health_bar3.png",
     "2": "health/health_bar2.png",
-    "1": "health/health_bar1.png"
+    "1": "health/health_bar1.png",
+    "0": "health/health_bar0.png"
   },
   "arrow": "models/Long arrow.png",
-  "sprites_firstperson": {
-    "left": "sprites/fp_left.png",
-    "right": "sprites/fp_right.png"
-  },
   "edgar": {
     "idle": "sprites/idle.gif",
     "jab": "sprites/jab.gif",
     "left_hook": "sprites/left hook.gif",
     "right_hook": "sprites/right hook.gif",
     "uppercut": "sprites/uppercut.gif"
+  },
+  "player": {
+    "left": "sprites/player_left.png",
+    "right": "sprites/player_right.png",
+    "still": "sprites/player_still.png"
+  },
+  "instructions": "instructions/instructions.gif",
+  "sounds": {
+    "choose": "audio/countdown.mp3",
+    "countdown": "audio/countdown.mp3",
+    "crowdcheer": "audio/crowdcheer.mp3",
+    "finishbell": "audio/finishbell.mp3",
+    "gameover": "audio/gameover.mp3",
+    "punch1": "audio/punch1.mp3",
+    "punch2": "audio/punch2.mp3",
+    "punch3": "audio/punch3.mp3",
+    "select": "audio/select.mp3",
+    "takedamage": "audio/takedamage.mp3"
+  },
+  "music": {
+    "backgroundmusic": "audio/backgroundmusic.mp3",
+    "calibration": "audio/calibration.mp3",
+    "guideline": "audio/guideline.mp3"
   }
 }

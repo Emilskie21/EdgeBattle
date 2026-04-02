@@ -12,6 +12,7 @@ import mediapipe as mp
 import numpy as np
 
 from game.paths import repo_root
+from game.gameplay.game_app import ShadowBoxingGame
 
 
 @dataclass
@@ -353,6 +354,8 @@ STABLE_FRAMES_VERIFY = 14
 
 
 def run(camera_index: int = 0, save_path: str = "head_pose_calibration.json") -> bool:
+    game = ShadowBoxingGame()
+    game.play_music("calibration", 1.0)
     win_name = "Verification"
     config = PoseConfig()
     root = repo_root()
@@ -532,6 +535,8 @@ def run(camera_index: int = 0, save_path: str = "head_pose_calibration.json") ->
             calibration_file.write_text(json.dumps(payload, indent=2), encoding="utf-8")
         except (OSError, TypeError, ValueError):
             pass
+    
+    game.stop_music()
 
     return calibration_completed
 

@@ -70,6 +70,7 @@ class UIRenderer:
             )
         else:
             self._menu_scaled = None
+        self.instructions = pack.get("instructions")
 
     def draw_frame(
         self,
@@ -115,8 +116,9 @@ class UIRenderer:
             self._draw_options(show_debug)
         elif game_state == GameState.COUNTDOWN:
             self._draw_countdown(countdown_value)
+        elif game_state == GameState.INSTRUCTIONS:
+            self._draw_instructions(dt_ms)
         elif game_state == GameState.PLAYING:
-            self._draw_edgar(dt_ms)
             self._draw_hud(stats, high_score)
             self._draw_fp_sprites()
             self._draw_arrow_prompt(
@@ -372,10 +374,19 @@ class UIRenderer:
             self.screen.set_clip(prev_clip)
 
             # End-screen controls (no restart-to-menu; no calibration screen here).
-            self._draw_text_center("PRESS 1: ANOTHER TRY", int(SCREEN_HEIGHT * 0.88), self.small_font, self.white)
-            self._draw_text_center(
-                "PRESS 2: ANOTHER PLAYER", int(SCREEN_HEIGHT * 0.92), self.small_font, self.accent
+            pad = 20
+
+            surf1 = self.small_font.render("PRESS 1: ANOTHER TRY", True, self.white)
+            rect1 = surf1.get_rect(
+                bottomright=(SCREEN_WIDTH - pad, SCREEN_HEIGHT - 40)
             )
+            self.screen.blit(surf1, rect1)
+
+            surf2 = self.small_font.render("PRESS 2: ANOTHER PLAYER", True, self.accent)
+            rect2 = surf2.get_rect(
+                bottomright=(SCREEN_WIDTH - pad, SCREEN_HEIGHT - 10)
+            )
+            self.screen.blit(surf2, rect2)
 
     def _draw_debug(self, debug_lines: list[str]) -> None:
         y = SCREEN_HEIGHT - 28 - 18 * len(debug_lines)
@@ -384,62 +395,26 @@ class UIRenderer:
             self.screen.blit(surface, (12, y))
             y += 18
 
-    def _draw_edgar(self, dt_ms: float) -> None:
-        if not self._edgar_current:
+    def _draw_instructions(self, dt_ms: float) -> None:
+        if not self.instructions:
             return
 
-        self._edgar_current.update(dt_ms)
-
-       
-        frame_fn = getattr(self._edgar_current, "current_frame", None)
-        if callable(frame_fn):
-            frame = frame_fn()
-        else:
-            
-            tmp = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
-            self._edgar_current.draw(tmp)
-            frame = tmp
-
-        fw, fh = frame.get_size()
-        if fw <= 1 or fh <= 1:
-            return
-
-        
-        visible_ratio = 0.80
-        visible_h = max(1, int(fh * visible_ratio))
-        crop_rect = pygame.Rect(0, 0, fw, visible_h)
-
-        dest_x = (SCREEN_WIDTH - fw) // 2
-        dest_y = SCREEN_HEIGHT - FP_SPRITE_BOTTOM_PAD - visible_h
-        self.screen.blit(frame, (dest_x, dest_y), area=crop_rect)
-
-    def set_edgar_anim(self, name: str, once: bool = False) -> None:
-        anim = self._edgar_sprites.get(name)
-        if not anim:
-            return
-
-        self._edgar_current = anim
-
+        # animated GIF support
         try:
-            anim._play_once = once
-            anim.reset()
-        except AttributeError:
+            self.instructions.update(dt_ms)
+            self.instructions.draw(self.screen)
+            return
+        except Exception:
             pass
 
-        if once:
-            try:
-                anim.set_on_finish(lambda: self.set_edgar_anim("idle"))
-            except AttributeError:
-                pass
-    
-    def play_edgar_for_direction(self, direction: Direction) -> None:
-        mapping = {
-            Direction.RIGHT: "left_hook",
-            Direction.LEFT: "right_hook",
-            Direction.UP: "uppercut",
-            Direction.DOWN: "jab",
-        }
+        # fallback if it's just a Surface
+        surf = self.instructions
+        w, h = surf.get_size()
 
-        name = mapping.get(direction)
-        if name:
-            self.set_edgar_anim(name, once=True)
+        scale = min(SCREEN_WIDTH / w, SCREEN_HEIGHT / h, 1.0)
+        nw, nh = int(w * scale), int(h * scale)
+
+        img = pygame.transform.smoothscale(surf, (nw, nh))
+        rect = img.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2))
+        self.screen.blit(img, rect)
+    

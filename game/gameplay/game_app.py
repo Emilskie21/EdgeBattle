@@ -22,11 +22,13 @@ from game.persistence.save_system import SaveSystem
 from game.persistence.leaderboard_db import LeaderboardDB, ScoreEntry, now_manila
 from game.tracking.pose_tracker import PoseTracker
 from game.ui.renderer import UIRenderer
+from game.ui.game_assets import load_packaged_surfaces
 
 
 class ShadowBoxingGame:
     def __init__(self) -> None:
         pygame.init()
+        pygame.mixer.init()
         try:
             self.screen = pygame.display.set_mode(
                 (SCREEN_WIDTH, SCREEN_HEIGHT),
@@ -40,12 +42,9 @@ class ShadowBoxingGame:
         self._last_dt_ms = 1000.0 / float(FPS)
 
         self.state_machine = StateMachine()
-        # Start immediately with the countdown; no traditional menu UI.
-        self.state_machine.state = GameState.COUNTDOWN
+        self.state_machine.state = GameState.INSTRUCTIONS
         self.save_system = SaveSystem()
         self.leaderboard_db = LeaderboardDB()
-        # Reset leaderboard data at startup (fresh run).
-        self.leaderboard_db.reset()
         self.save_data = self.save_system.load()
 
         self.stats = PlayerStats(high_score=int(self.save_data.get("high_score", 0)))
@@ -68,7 +67,8 @@ class ShadowBoxingGame:
         self._dodge_head_moved: bool = False
 
         # Countdown before gameplay begins (seconds).
-        self._countdown_start_ms: int = pygame.time.get_ticks()
+        # self._countdown_start_ms: int = pygame.time.get_ticks()
+        self._countdown_start_ms = pygame.time.get_ticks()
         self._countdown_value: int = 3
 
         # Game-over UI state.
@@ -81,8 +81,11 @@ class ShadowBoxingGame:
         self._game_over_total: int = 0
         self._game_over_scores: list[dict[str, str | int]] = []
         self._leaderboard_scroll_y: float = 0.0
+        self.pack = load_packaged_surfaces()
 
     def run(self) -> None:
+        instructions = self.pack.get("instructions")
+
         while self.running:
             dt_seconds = self.clock.tick(FPS) / 1000.0
             self._last_dt_ms = dt_seconds * 1000.0
@@ -95,6 +98,7 @@ class ShadowBoxingGame:
     def _handle_events(self) -> None:
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
+                self.leaderboard_db.reset()
                 self.running = False
                 return
 
@@ -118,7 +122,7 @@ class ShadowBoxingGame:
                 if self.state_machine.state == GameState.MENU:
                     self.running = False
                 else:
-                    self.state_machine.transition_to(GameState.MENU)
+                    self.state_machine.transition_to(GameState.COUNTDOWN)
                 continue
 
             if self.state_machine.state == GameState.MENU:
@@ -214,7 +218,7 @@ class ShadowBoxingGame:
                 except Exception:
                     pass
                 self._run_calibration()
-                self.state_machine.state = GameState.COUNTDOWN
+                self.state_machine.state = GameState.INSTRUCTIONS
                 self._countdown_start_ms = pygame.time.get_ticks()
                 self._countdown_value = 3
                 self._game_over_phase = 1
@@ -297,6 +301,15 @@ class ShadowBoxingGame:
         state = self.state_machine.state
         now = pygame.time.get_ticks()
 
+        if state == GameState.INSTRUCTIONS:
+            elapsed = now - self._countdown_start_ms
+            self._countdown_value = max(0, 3 - int(elapsed / 1000))
+
+            if elapsed >= 11000:
+                self.state_machine.transition_to(GameState.COUNTDOWN)
+                self._countdown_start_ms = now
+            return
+
         if state == GameState.COUNTDOWN:
             elapsed = now - self._countdown_start_ms
             # 3..2..1..0 progression (1 second per step).
@@ -308,7 +321,7 @@ class ShadowBoxingGame:
         if state == GameState.MENU:
             # No menu UI: once calibrated, immediately begin countdown.
             if is_calibrated():
-                self.state_machine.transition_to(GameState.COUNTDOWN)
+                self.state_machine.transition_to(GameState.INSTRUCTIONS)
                 self._countdown_start_ms = now
                 self._countdown_value = 3
             return
@@ -352,8 +365,8 @@ class ShadowBoxingGame:
         if self.current_arrow is not None and gated is not None and gated == self.current_arrow:
             prompt_dir = self.current_arrow
             self.combat.on_matched_shown_arrow(self.stats)
-            if prompt_dir is not None:
-                self.ui.play_edgar_for_direction(prompt_dir)
+            # if prompt_dir is not None:
+            #     self.ui.play_edgar_for_direction(prompt_dir)
             self.punch_flash_until_ms = now + PUNCH_FLASH_MS
             self.current_arrow = None
             if self.stats.hp <= 0:
@@ -364,8 +377,8 @@ class ShadowBoxingGame:
             if not self._dodge_head_moved:
                 prompt_dir = self.current_arrow
                 self.combat.on_matched_shown_arrow(self.stats)
-                if prompt_dir is not None:
-                    self.ui.play_edgar_for_direction(prompt_dir)
+                # if prompt_dir is not None:
+                #     self.ui.play_edgar_for_direction(prompt_dir)
                 self.punch_flash_until_ms = now + PUNCH_FLASH_MS
                 self.current_arrow = None
                 if self.stats.hp <= 0:
@@ -468,3 +481,28 @@ class ShadowBoxingGame:
             "hp": self.stats.hp,
             "score": self.stats.score,
         }
+    
+    def play_sound(self, name: str, volume: float) -> None:
+        try:
+            snd = self.pack["sound"].get(name)
+            if snd:
+                snd.set_volume(volume)
+                snd.play()
+        except Exception:
+            pass
+
+    def play_music(self, name: str, volume: float, loop: bool = True) -> None:
+        try:
+            music_path = self.pack["music"].get(name)
+            if music_path:
+                pygame.mixer.music.load(music_path)
+                pygame.mixer.music.set_volume(volume)
+                pygame.mixer.music.play(-1 if loop else 0)
+        except Exception:
+            pass
+
+    def stop_music(self) -> None:
+        try:
+            pygame.mixer.music.stop()
+        except Exception:
+            pass
