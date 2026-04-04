@@ -22,6 +22,7 @@ class PoseTrackingResult:
     # Debug-friendly fields (harmless for gameplay logic).
     pitch: float = 0.0
     yaw: float = 0.0
+    face_points: Optional[list[tuple[float, float]]] = None
 
 
 class PoseTracker:
@@ -227,16 +228,19 @@ class PoseTracker:
         face_3d = []
         nose_xy = None
 
+        face_points = []
+
         for idx in landmark_ids:
             lm = face_landmarks[idx]
             x_px, y_px = int(lm.x * img_w), int(lm.y * img_h)
             face_2d.append([x_px, y_px])
             face_3d.append([x_px, y_px, lm.z])
-            if idx == 1:
-                nose_xy = (float(lm.x * img_w), float(lm.y * img_h))
+            face_points.append((float(x_px), float(y_px)))
+            # if idx == 1:
+            #     nose_xy = (float(lm.x * img_w), float(lm.y * img_h))
 
-        if nose_xy is None:
-            return PoseTrackingResult(camera_ok=True, detection_ok=False)
+        # if nose_xy is None:
+        #     return PoseTrackingResult(camera_ok=True, detection_ok=False)
 
         face_2d_np = np.asarray(face_2d, dtype=np.float32).reshape((-1, 2))
         face_3d_np = np.asarray(face_3d, dtype=np.float32).reshape((-1, 3))
@@ -305,6 +309,7 @@ class PoseTracker:
             visual_direction=raw_dir,
             pitch=pitch_norm,
             yaw=yaw_norm,
+            face_points=face_points,
         )
 
     def __del__(self) -> None:

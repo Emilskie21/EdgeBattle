@@ -16,7 +16,7 @@ from game.constants import (
 from game.constants import Direction
 from game.paths import repo_root
 from game.ui import game_assets
-from game.ui.animated_background import BackgroundDrawable
+from game.ui.animated_background import BackgroundDrawable, GifBackground
 
 
 class UIRenderer:
@@ -43,7 +43,9 @@ class UIRenderer:
         pack = game_assets.load_packaged_surfaces()
 
         self._edgar_sprites = pack.get("sprites_edgar") or {}
-        self._edgar_current: BackgroundDrawable | None = self._edgar_sprites.get("idle")
+        self._edgar_current: GifBackground = self._edgar_sprites.get("idle")
+
+        self._player_sprites = pack.get("sprites_player") or {}
 
         self._menu_static = pack.get("menu_static")
         self._game_bg: BackgroundDrawable | None = pack.get("game_bg")
@@ -71,6 +73,9 @@ class UIRenderer:
         else:
             self._menu_scaled = None
         self.instructions = pack.get("instructions")
+        self.left_hand = "left_idle"
+        self.right_hand = "right_idle"
+        self._punch_end_ms = 0
 
     def draw_frame(
         self,
@@ -98,8 +103,12 @@ class UIRenderer:
     ) -> None:
         if game_state in (GameState.PLAYING, GameState.COUNTDOWN, GameState.GAME_OVER):
             if self._game_bg:
+                frame = self._game_bg._frames[self._game_bg._idx]
+                frame = pygame.transform.scale(frame, (1104, 621))
+                r = frame.get_rect()
+                r.center = (SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2)
                 self._game_bg.update(dt_ms)
-                self._game_bg.draw(self.screen)
+                self.screen.blit(frame, r)
             else:
                 self.screen.fill((24, 22, 38))
         else:
@@ -120,12 +129,13 @@ class UIRenderer:
             self._draw_instructions(dt_ms)
         elif game_state == GameState.PLAYING:
             self._draw_hud(stats, high_score)
-            self._draw_fp_sprites()
+            self._draw_edgar(self._edgar_current, dt_ms)
             self._draw_arrow_prompt(
                 current_arrow,
                 arrow_start_ms,
                 arrow_deadline_ms,
             )
+            self._draw_player_hands(self.left_hand, self.right_hand)
             self._draw_punch_flash(punch_flash_until_ms)
         elif game_state == GameState.GAME_OVER:
             self._draw_game_over_screen(
@@ -171,8 +181,9 @@ class UIRenderer:
         pad_x = 16
         y = 12
         hp_surf = self._hp_by_value.get(stats.hp)
+        hp_scaled = pygame.transform.smoothscale(hp_surf, (250, 59))
         if hp_surf:
-            self.screen.blit(hp_surf, (pad_x, y))
+            self.screen.blit(hp_scaled, (pad_x, y))
         # If heart images are missing, HUD simply won't show HP.
 
         # hi = self.small_font.render(f"HIGH  {high_score:06d}", True, self.accent)
@@ -418,3 +429,34 @@ class UIRenderer:
         rect = img.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2))
         self.screen.blit(img, rect)
     
+    def _draw_player_hands(self, left_name: str, right_name: str) -> None:
+        bottom = SCREEN_HEIGHT
+        left = self._player_sprites.get(left_name)
+        right = self._player_sprites.get(right_name)
+        left = pygame.transform.scale(left, (978, 550))
+        right = pygame.transform.scale(right, (978, 550))
+        if left:
+            r = left.get_rect()
+            r.bottomleft = (0, bottom)
+            self.screen.blit(left, r)
+        if right:
+            r = right.get_rect()
+            r.bottomright = (SCREEN_WIDTH, bottom)
+            self.screen.blit(right, r)
+
+    def _draw_edgar(self, current_sprite: GifBackground, dt_ms: float) -> None:
+        if not current_sprite:
+            return
+
+        # Get current frame
+        frame = current_sprite._frames[current_sprite._idx]
+
+        # Resize (change numbers as needed)
+        frame = pygame.transform.scale(frame, (564, 800))
+
+        # Position (example: bottom center like a character)
+        r = frame.get_rect()
+        r.midbottom = (SCREEN_WIDTH // 2, SCREEN_HEIGHT)
+        r.y += 300
+        self.screen.blit(frame, r)
+        current_sprite.update(dt_ms)

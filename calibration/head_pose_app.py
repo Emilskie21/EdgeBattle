@@ -99,7 +99,7 @@ class HeadPoseEstimator:
         img_h, img_w = frame_bgr.shape[:2]
         face_2d = []
         face_3d = []
-        nose_2d = None
+        face_points = []
 
         landmarks = result.face_landmarks[0]
         for idx in self.LANDMARK_IDS:
@@ -107,11 +107,8 @@ class HeadPoseEstimator:
             x_px, y_px = int(lm.x * img_w), int(lm.y * img_h)
             face_2d.append([x_px, y_px])
             face_3d.append([x_px, y_px, lm.z])
-            if idx == 1:
-                nose_2d = (float(lm.x * img_w), float(lm.y * img_h))
+            face_points.append((float(x_px), float(y_px)))
 
-        if nose_2d is None:
-            return None
 
         face_2d_np = np.array(face_2d, dtype=np.float64)
         face_3d_np = np.array(face_3d, dtype=np.float64)
@@ -142,8 +139,7 @@ class HeadPoseEstimator:
             "pitch": pitch,
             "yaw": yaw,
             "direction": direction,
-            "nose_x": nose_2d[0],
-            "nose_y": nose_2d[1],
+            "face_points": face_points,
             "tx": float(trans_vec[0][0]),
             "ty": float(trans_vec[1][0]),
             "tz": float(trans_vec[2][0]),
@@ -180,19 +176,21 @@ def _composite_calibration_background(
     return out
 
 
-def _nose_in_face_oval(
-    nose_x: float,
-    nose_y: float,
-    center: Tuple[int, int],
-    axes: Tuple[int, int],
-) -> bool:
-    cx, cy = center
-    a, b = axes
-    if a <= 0 or b <= 0:
+def _nose_in_face_oval(face_points, center, axes):
+    if not face_points:
         return False
-    dx = (nose_x - cx) / float(a)
-    dy = (nose_y - cy) / float(b)
-    return dx * dx + dy * dy <= 1.0
+
+    cx, cy = center
+    ax, ay = axes
+
+    # check that ALL face points lie inside the oval
+    for x, y in face_points:
+        dx = (x - cx) / ax
+        dy = (y - cy) / ay
+        if dx * dx + dy * dy > 1.0:
+            return False
+
+    return True
 
 
 def _primary_instruction_scale(w: int) -> float:
@@ -355,7 +353,7 @@ STABLE_FRAMES_VERIFY = 14
 
 def run(camera_index: int = 0, save_path: str = "head_pose_calibration.json") -> bool:
     game = ShadowBoxingGame()
-    game.play_music("calibration", 1.0)
+    game.play_music("calibration", 0.7)
     win_name = "Verification"
     config = PoseConfig()
     root = repo_root()
@@ -432,8 +430,9 @@ def run(camera_index: int = 0, save_path: str = "head_pose_calibration.json") ->
         face_in_guide = False
         if pose is not None:
             face_in_guide = _nose_in_face_oval(
-                float(pose["nose_x"]),
-                float(pose["nose_y"]),
+                pose["face_points"],
+                # float(pose["nose_x"]),
+                # float(pose["nose_y"]),
                 center,
                 axes,
             )
@@ -458,6 +457,7 @@ def run(camera_index: int = 0, save_path: str = "head_pose_calibration.json") ->
                 verify_step = 0
                 verify_hold = 0
                 straight_hold = 0
+                game.play_sound("choose", 0.2)
 
         elif phase == "verify":
             if verify_step >= len(verify_order):
@@ -474,6 +474,7 @@ def run(camera_index: int = 0, save_path: str = "head_pose_calibration.json") ->
             if verify_hold >= STABLE_FRAMES_VERIFY:
                 verify_step += 1
                 verify_hold = 0
+                game.play_sound("choose", 0.2)
             if verify_step >= len(verify_order):
                 calibration_completed = True
                 break

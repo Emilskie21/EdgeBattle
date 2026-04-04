@@ -20,6 +20,8 @@ ARROW_CENTER_Y_RATIO = 0.28
 FP_SPRITE_MAX_HEIGHT_RATIO = 0.38
 FP_SPRITE_BOTTOM_PAD = 12
 
+DIFFICULTY = 0.4
+
 SAVE_FILE = str(repo_root() / "data" / "save_data.json")
 
 

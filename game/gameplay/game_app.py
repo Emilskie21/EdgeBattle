@@ -16,6 +16,7 @@ from game.constants import (
     SCREEN_HEIGHT,
     SCREEN_WIDTH,
     SCORE_PER_DODGE_TICK,
+    DIFFICULTY
 )
 from game.gameplay.state_machine import StateMachine
 from game.persistence.save_system import SaveSystem
@@ -63,6 +64,9 @@ class ShadowBoxingGame:
         self.arrow_start_ms: int = 0
         self.arrow_deadline_ms: int = 0
         self.punch_flash_until_ms: int = 0
+        self.player_punch_until_ms: int = 0
+        self.punching_hand = "left"
+        self.edgar_punch_timing: float = 0
         # True once player tilts head off neutral (forward) during current prompt
         self._dodge_head_moved: bool = False
 
@@ -83,8 +87,17 @@ class ShadowBoxingGame:
         self._leaderboard_scroll_y: float = 0.0
         self.pack = load_packaged_surfaces()
 
+        self.music_playing: bool = False
+        self.play_once = False
+        self.ui._edgar_current._speed = 2.8
+        self.current_punch_sfx = 1
+        self.punch_sfx_early = 0
+        self.player_damage_sfx_safety = False
+        self.gameover_sfx = 1
+        self.gameover_sfx_delay = 0
+
     def run(self) -> None:
-        instructions = self.pack.get("instructions")
+        # instructions = self.pack.get("instructions")
 
         while self.running:
             dt_seconds = self.clock.tick(FPS) / 1000.0
@@ -104,6 +117,7 @@ class ShadowBoxingGame:
 
             # Text entry for name: use TEXTINPUT for reliability.
             if self.state_machine.state == GameState.GAME_OVER and event.type == pygame.TEXTINPUT:
+                self.play_sound("select", 0.3)
                 if self._game_over_phase == 1 and not self._game_over_name_saved:
                     text = getattr(event, "text", "") or ""
                     for ch in text:
@@ -195,7 +209,7 @@ class ShadowBoxingGame:
                     pygame.key.stop_text_input()
                 except Exception:
                     pass
-                self.state_machine.state = GameState.COUNTDOWN
+                self.state_machine.state = GameState.INSTRUCTIONS
                 self._countdown_start_ms = pygame.time.get_ticks()
                 self._countdown_value = 3
                 self._game_over_phase = 1
@@ -208,6 +222,7 @@ class ShadowBoxingGame:
                 self._leaderboard_scroll_y = 0.0
                 self.current_arrow = None
                 self.punch_flash_until_ms = 0
+                self.player_punch_until_ms = 0
                 self.arrow_start_ms = 0
                 self.arrow_deadline_ms = 0
                 return
@@ -231,6 +246,7 @@ class ShadowBoxingGame:
                 self._leaderboard_scroll_y = 0.0
                 self.current_arrow = None
                 self.punch_flash_until_ms = 0
+                self.player_punch_until_ms = 0
                 self.arrow_start_ms = 0
                 self.arrow_deadline_ms = 0
                 return
@@ -290,11 +306,11 @@ class ShadowBoxingGame:
         now = pygame.time.get_ticks()
         self.current_arrow = random.choice(list(Direction))
         self.arrow_start_ms = now
-        speed = max(450, ARROW_DISPLAY_MS - self.stats.score * 0.05)
+        speed = max(450, ARROW_DISPLAY_MS - self.stats.score * DIFFICULTY)
         self.arrow_deadline_ms = now + speed
         self._dodge_head_moved = False
-        # No robot punch here — punches are triggered only when a prompt is hit.
-        self.previous_arrow = self.current_arrow
+        self.edgar_punch_timing = now + speed * 0.35
+        self.punch_sfx_early = now + speed * 0.8
 
     def _update(self, dt_seconds: float) -> None:
         _ = dt_seconds
@@ -304,18 +320,28 @@ class ShadowBoxingGame:
         if state == GameState.INSTRUCTIONS:
             elapsed = now - self._countdown_start_ms
             self._countdown_value = max(0, 3 - int(elapsed / 1000))
+            self.play_music("guideline")
 
             if elapsed >= 11000:
                 self.state_machine.transition_to(GameState.COUNTDOWN)
                 self._countdown_start_ms = now
+            if elapsed >= 10200:
+                if not self.play_once:
+                    self.play_sound("countdown", 0.4)
+                    self.play_once = True
+                    self.stop_music()
+                    self.play_music("backgroundmusic", 0.5)
             return
 
         if state == GameState.COUNTDOWN:
+            self.gameover_sfx = 1
             elapsed = now - self._countdown_start_ms
             # 3..2..1..0 progression (1 second per step).
             self._countdown_value = max(0, 3 - int(elapsed / 1000))
             if elapsed >= 3000:
+                self.play_sound("crowdcheer")
                 self._start_new_game()
+                self.play_once = False
             return
 
         if state == GameState.MENU:
@@ -327,10 +353,25 @@ class ShadowBoxingGame:
             return
 
         if state != GameState.PLAYING:
+            if self.gameover_sfx == 1:
+                self.gameover_sfx_delay = now + 700
+                self.stop_music()
+                self.play_sound("finishbell")
+                self.gameover_sfx = 2
+            elif self.gameover_sfx == 2 and now >= self.gameover_sfx_delay and self.gameover_sfx_delay > 0:
+                self.gameover_sfx_delay = 0
+                self.play_sound("gameover")
+                self.gameover_sfx = 0
             if state == GameState.GAME_OVER and self._game_over_phase == 2:
                 # Scroll leaderboard slowly.
                 self._leaderboard_scroll_y += float(dt_seconds) * 28.0
             return
+        
+        if now >= self.player_punch_until_ms and self.player_punch_until_ms > 0:
+            self.player_punch_until_ms = 0
+            self.ui.left_hand = "left_idle"
+            self.ui.right_hand = "right_idle"
+            self.punching_hand = "right" if self.punching_hand == "left" else "left"
 
         if self.punch_flash_until_ms > now:
             return
@@ -346,6 +387,27 @@ class ShadowBoxingGame:
             self.pose_visual_dir = pose_result.visual_direction
         else:
             self.pose_visual_dir = None
+
+        edgar = self.ui._edgar_current
+
+
+        if now >= self.edgar_punch_timing and self.edgar_punch_timing > 0:
+            self.edgar_punch_timing = 0
+            sprite_map = {
+                Direction.LEFT: ("left_hook", 1.8),
+                Direction.RIGHT: ("right_hook", 1.8),
+                Direction.UP: ("uppercut", 1.8),
+                Direction.DOWN: ("jab", 1.8),
+            }
+            if self.current_arrow in sprite_map:
+                name, speed = sprite_map[self.current_arrow]
+                self.ui._edgar_current = self.ui._edgar_sprites.get(name)
+                self.ui._edgar_current.reset()
+                self.ui._edgar_current._speed = speed
+        elif edgar.finished() and edgar is not self.ui._edgar_sprites.get("idle"):
+            self.ui._edgar_current = self.ui._edgar_sprites.get("idle")
+            self.ui._edgar_current.reset()
+            self.ui._edgar_current._speed = 2.0
 
         if self.current_arrow is None:
             self._spawn_arrow()
@@ -386,6 +448,9 @@ class ShadowBoxingGame:
                 return
             self.stats.add_score(SCORE_PER_DODGE_TICK)
             self._spawn_arrow()
+            
+            self.player_punch_until_ms = now + 170
+            self.punch()
 
         if self.stats.hp <= 0:
             self._to_game_over()
@@ -398,6 +463,7 @@ class ShadowBoxingGame:
         self.stats.hp = MAX_HP
         self.stats.score = 0
         self.punch_flash_until_ms = 0
+        self.player_punch_until_ms = 0
         self._game_over_since_ms = 0
         self._game_over_name_input = ""
         self._game_over_name_saved = False
@@ -451,6 +517,7 @@ class ShadowBoxingGame:
             arrow_start_ms=self.arrow_start_ms if self.current_arrow else 0,
             arrow_deadline_ms=self.arrow_deadline_ms if self.current_arrow else 0,
             punch_flash_until_ms=self.punch_flash_until_ms,
+            # player_punch_until_ms=self.player_punch_until_ms,
             dt_ms=self._last_dt_ms,
             calibrated=is_calibrated(),
             countdown_value=self._countdown_value if self.state_machine.state == GameState.COUNTDOWN else None,
@@ -482,7 +549,7 @@ class ShadowBoxingGame:
             "score": self.stats.score,
         }
     
-    def play_sound(self, name: str, volume: float) -> None:
+    def play_sound(self, name: str, volume: float = 1.0) -> None:
         try:
             snd = self.pack["sound"].get(name)
             if snd:
@@ -491,18 +558,38 @@ class ShadowBoxingGame:
         except Exception:
             pass
 
-    def play_music(self, name: str, volume: float, loop: bool = True) -> None:
+    def play_music(self, name: str, volume: float = 1.0, loop: bool = True) -> None:
         try:
             music_path = self.pack["music"].get(name)
-            if music_path:
+            if music_path and self.music_playing == False:
                 pygame.mixer.music.load(music_path)
                 pygame.mixer.music.set_volume(volume)
                 pygame.mixer.music.play(-1 if loop else 0)
+                self.music_playing = True
         except Exception:
             pass
 
     def stop_music(self) -> None:
         try:
             pygame.mixer.music.stop()
+            self.music_playing = False
         except Exception:
             pass
+
+    def punch(self):
+        if self.punching_hand == "left":
+            self.ui.left_hand = "left_punch"
+        elif self.punching_hand == "right":
+            self.ui.right_hand = "right_punch"
+    
+    def punch_sound(self, vol: float = 1.0):
+        current_sfx = self.current_punch_sfx
+        if current_sfx == 1:
+            self.play_sound("punch1", vol)
+            self.current_punch_sfx+=1
+        elif current_sfx == 2:
+            self.play_sound("punch2", vol)
+            self.current_punch_sfx+=1
+        elif current_sfx == 3:
+            self.play_sound("punch3", vol)
+            self.current_punch_sfx=1

@@ -11,18 +11,20 @@
   "edgar": {
     "idle": "sprites/idle.gif",
     "jab": "sprites/jab.gif",
-    "left_hook": "sprites/left hook.gif",
-    "right_hook": "sprites/right hook.gif",
+    "left_hook": "sprites/left_hook.gif",
+    "right_hook": "sprites/right_hook.gif",
     "uppercut": "sprites/uppercut.gif"
   },
   "player": {
-    "left": "sprites/player_left.png",
-    "right": "sprites/player_right.png",
-    "still": "sprites/player_still.png"
+    "left_idle": "sprites/left_idle.png",
+    "right_idle": "sprites/right_idle.png",
+    "left_punch": "sprites/left_punch.png",
+    "right_punch": "sprites/right_punch.png"
   },
   "instructions": "instructions/instructions.gif",
   "sounds": {
-    "choose": "audio/countdown.mp3",
+    "choose": "audio/choose.mp3",
+    "select": "audio/select.mp3",
     "countdown": "audio/countdown.mp3",
     "crowdcheer": "audio/crowdcheer.mp3",
     "finishbell": "audio/finishbell.mp3",
@@ -30,7 +32,6 @@
     "punch1": "audio/punch1.mp3",
     "punch2": "audio/punch2.mp3",
     "punch3": "audio/punch3.mp3",
-    "select": "audio/select.mp3",
     "takedamage": "audio/takedamage.mp3"
   },
   "music": {
