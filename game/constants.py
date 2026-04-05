@@ -13,7 +13,7 @@ ARROW_DISPLAY_MS = 1000
 PUNCH_FLASH_MS = 250
 
 # Score per arrow interval survived without matching the prompt
-SCORE_PER_DODGE_TICK = 20
+SCORE_PER_DODGE_TICK = 40
 
 # Layout: arrow above first-person sprite zone (ratios of screen height, top-down)
 ARROW_CENTER_Y_RATIO = 0.28
