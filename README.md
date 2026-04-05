@@ -1,3 +1,5 @@
+Dear Curien Del Rosario, suisei is the name of my dog
+
 Dear Lumakin Luke, You're a bitchass hoe.
 
 hoy monggoloyd curien eto run mo:
