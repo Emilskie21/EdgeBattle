@@ -76,6 +76,11 @@ class UIRenderer:
         self.left_hand = "left_idle"
         self.right_hand = "right_idle"
         self._punch_end_ms = 0
+        self.loading_icon: GifBackground = pack.get("loading")
+        gradients = pack.get("gradient") or {}
+        self.side_gradient: pygame.Surface = gradients.get("side")
+        self.level_gradient: pygame.Surface = gradients.get("level")
+        self.gradient_current: str = None
 
     def draw_frame(
         self,
@@ -127,6 +132,7 @@ class UIRenderer:
             self._draw_countdown(countdown_value)
         elif game_state == GameState.INSTRUCTIONS:
             self._draw_instructions(dt_ms)
+            self.draw_loading(dt_ms)
         elif game_state == GameState.PLAYING:
             self._draw_hud(stats, high_score)
             self._draw_edgar(self._edgar_current, dt_ms)
@@ -137,6 +143,7 @@ class UIRenderer:
             )
             self._draw_player_hands(self.left_hand, self.right_hand)
             self._draw_punch_flash(punch_flash_until_ms)
+            self.draw_gradient(self.gradient_current)
         elif game_state == GameState.GAME_OVER:
             self._draw_game_over_screen(
                 stats_score=stats.score,
@@ -435,13 +442,14 @@ class UIRenderer:
         right = self._player_sprites.get(right_name)
         left = pygame.transform.scale(left, (978, 550))
         right = pygame.transform.scale(right, (978, 550))
+        lower_stance = 70
         if left:
             r = left.get_rect()
-            r.bottomleft = (0, bottom)
+            r.bottomleft = (0, bottom + lower_stance)
             self.screen.blit(left, r)
         if right:
             r = right.get_rect()
-            r.bottomright = (SCREEN_WIDTH, bottom)
+            r.bottomright = (SCREEN_WIDTH, bottom + lower_stance)
             self.screen.blit(right, r)
 
     def _draw_edgar(self, current_sprite: GifBackground, dt_ms: float) -> None:
@@ -460,3 +468,49 @@ class UIRenderer:
         r.y += 300
         self.screen.blit(frame, r)
         current_sprite.update(dt_ms)
+
+    def draw_loading(self, dt_ms):
+        if self.loading_icon is None:
+            return
+        
+        frame = self.loading_icon._frames[self.loading_icon._idx]
+
+        pad = 10
+        self.loading_icon.update(dt_ms)
+        nw = int(frame.get_width() * 0.03)
+        nh = int(frame.get_height() * 0.06)
+        img = pygame.transform.smoothscale(frame, (nw, nh))
+
+        rect = img.get_rect()
+        rect.bottomright = (SCREEN_WIDTH - pad, SCREEN_HEIGHT - pad)
+
+        self.screen.blit(img, rect)
+
+    def draw_gradient(self, current_gradient):
+        if not current_gradient:
+            return
+
+        side = self.side_gradient
+        level = self.level_gradient
+
+        img = None
+
+        if current_gradient in ("left", "right") and side:
+            sw, sh = side.get_size()
+            scale = min(SCREEN_WIDTH / sw, SCREEN_HEIGHT / sh, 1.0)
+            img = pygame.transform.smoothscale(side, (int(sw * scale), int(sh * scale)))
+
+            if current_gradient == "right":
+                img = pygame.transform.flip(img, True, False)
+
+        elif current_gradient in ("up", "down") and level:
+            lw, lh = level.get_size()
+            scale = min(SCREEN_WIDTH / lw, SCREEN_HEIGHT / lh, 1.0)
+            img = pygame.transform.smoothscale(level, (int(lw * scale), int(lh * scale)))
+
+            if current_gradient == "up":
+                img = pygame.transform.flip(img, False, True)
+            
+        if img:
+            rect = img.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2))
+            self.screen.blit(img, rect)

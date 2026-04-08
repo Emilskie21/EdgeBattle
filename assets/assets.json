@@ -41,5 +41,10 @@
     "backgroundmusic": "audio/backgroundmusic.mp3",
     "calibration": "audio/calibration.mp3",
     "guideline": "audio/guideline.mp3"
+  },
+  "loading": "loading/spinner.gif",
+  "gradient": {
+    "side": "gradient/side_gradient.png",
+    "level": "gradient/level_gradient.png"
   }
 }

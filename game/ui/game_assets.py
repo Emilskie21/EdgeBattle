@@ -33,7 +33,9 @@ def load_packaged_surfaces() -> dict[str, Any]:
         "sprites_player": {},
         "instructions": None,
         "music": {},
-        "sound": {}
+        "sound": {},
+        "loading": None,
+        "gradient": {}
     }
     if not m:
         return out
@@ -112,6 +114,20 @@ def load_packaged_surfaces() -> dict[str, Any]:
                 mus = _load_music(resolve_asset(rel))
                 if mus is not None:
                     out["music"][name] = mus
+
+    load = m.get("loading")
+    if isinstance(load, str):
+        loa = load_background_from_path(resolve_asset(load))
+        if loa is not None:
+            out["loading"] = loa
+
+    gradi = m.get("gradient")
+    if isinstance(gradi, dict):
+        for name, rel in gradi.items():
+            if isinstance(rel, str):
+                gra = _load_raster(resolve_asset(rel))
+                if gra is not None:
+                    out["gradient"][name] = gra
 
     return out
 

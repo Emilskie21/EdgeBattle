@@ -1,7 +1,7 @@
 import random
 from typing import Any, Optional
 
-import pygame
+import pygame, random
 
 from game.calibration_state import is_calibrated
 from game.combat.combat_system import CombatSystem
@@ -313,6 +313,7 @@ class ShadowBoxingGame:
         self._dodge_head_moved = False
         self.edgar_punch_timing = now + 390
         self.edgar_early_punch_sfx = now + 300
+        self.gradient(self.current_arrow)
 
     def _update(self, dt_seconds: float) -> None:
         _ = dt_seconds
@@ -381,7 +382,7 @@ class ShadowBoxingGame:
             self.player_punch_until_ms = 0
             self.ui.left_hand = "left_idle"
             self.ui.right_hand = "right_idle"
-            self.punching_hand = "right" if self.punching_hand == "left" else "left"
+            self.punching_hand = "right" if random.randint(1,2) == 1 else "left"
 
         if self.punch_flash_until_ms > now:
             return
@@ -404,8 +405,8 @@ class ShadowBoxingGame:
         if now >= self.edgar_punch_timing and self.edgar_punch_timing > 0:
             self.edgar_punch_timing = 0
             sprite_map = {
-                Direction.LEFT: ("left_hook", 1.8),
-                Direction.RIGHT: ("right_hook", 1.8),
+                Direction.LEFT: ("right_hook", 1.8),
+                Direction.RIGHT: ("left_hook", 1.8),
                 Direction.UP: ("uppercut", 1.8),
                 Direction.DOWN: ("jab", 1.8),
             }
@@ -613,3 +614,14 @@ class ShadowBoxingGame:
         elif current_sfx == 3:
             self.play_sound("punch6", vol)
             self.current_edgar_punch_sfx=1
+    
+    def gradient(self, current_arrow):
+        self.ui.gradient_current = None
+        if current_arrow == Direction.LEFT:
+            self.ui.gradient_current = "left"
+        elif current_arrow == Direction.RIGHT:
+            self.ui.gradient_current = "right"
+        elif current_arrow == Direction.UP:
+            self.ui.gradient_current = "up"
+        elif current_arrow == Direction.DOWN:
+            self.ui.gradient_current = "down"
