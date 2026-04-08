@@ -13,12 +13,14 @@ ARROW_DISPLAY_MS = 1000
 PUNCH_FLASH_MS = 250
 
 # Score per arrow interval survived without matching the prompt
-SCORE_PER_DODGE_TICK = 20
+SCORE_PER_DODGE_TICK = 40
 
 # Layout: arrow above first-person sprite zone (ratios of screen height, top-down)
 ARROW_CENTER_Y_RATIO = 0.28
 FP_SPRITE_MAX_HEIGHT_RATIO = 0.38
 FP_SPRITE_BOTTOM_PAD = 12
+
+DIFFICULTY = 0.4
 
 SAVE_FILE = str(repo_root() / "data" / "save_data.json")
 
@@ -29,6 +31,7 @@ class GameState(Enum):
     COUNTDOWN = auto()
     PLAYING = auto()
     GAME_OVER = auto()
+    INSTRUCTIONS = auto()
 
 
 class TurnState(Enum):
