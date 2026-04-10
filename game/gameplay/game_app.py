@@ -97,6 +97,7 @@ class ShadowBoxingGame:
         self.punch_sound_time: int = 0
         self.current_edgar_punch_sfx = 1
         self.edgar_early_punch_sfx = 0
+        self.delay_before_game_start = 0
 
     def run(self) -> None:
         # instructions = self.pack.get("instructions")
@@ -342,8 +343,11 @@ class ShadowBoxingGame:
             # 3..2..1..0 progression (1 second per step).
             self._countdown_value = max(0, 3 - int(elapsed / 1000))
             if elapsed >= 3000:
+                self.delay_before_game_start = now + 3000
+                self.ui._edgar_current._speed = 1.1
+                if not self.state_machine.transition_to(GameState.PLAYING):
+                    self.state_machine.state = GameState.PLAYING
                 self.play_sound("crowdcheer")
-                self._start_new_game()
                 self.play_once = False
             return
 
@@ -368,6 +372,9 @@ class ShadowBoxingGame:
             if state == GameState.GAME_OVER and self._game_over_phase == 2:
                 # Scroll leaderboard slowly.
                 self._leaderboard_scroll_y += float(dt_seconds) * 28.0
+            return
+
+        if self.delay_before_game_start and now < self.delay_before_game_start:
             return
         
         if self.punch_sound_time and now >= self.punch_sound_time and self.punch_sound_time > 0:
@@ -420,6 +427,10 @@ class ShadowBoxingGame:
             self.ui._edgar_current.reset()
             self.ui._edgar_current._speed = 2.0
 
+        if now > self.delay_before_game_start and self.delay_before_game_start > 0:
+            self.delay_before_game_start = 0
+            self._start_new_game()
+
         if self.current_arrow is None:
             self._spawn_arrow()
 
@@ -468,8 +479,8 @@ class ShadowBoxingGame:
     def _start_new_game(self) -> None:
         if not is_calibrated():
             return
-        if not self.state_machine.transition_to(GameState.PLAYING):
-            self.state_machine.state = GameState.PLAYING
+        # if not self.state_machine.transition_to(GameState.PLAYING):
+        #     self.state_machine.state = GameState.PLAYING
         self.stats.hp = MAX_HP
         self.stats.score = 0
         self.punch_flash_until_ms = 0

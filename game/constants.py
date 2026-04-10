@@ -16,7 +16,7 @@ PUNCH_FLASH_MS = 250
 SCORE_PER_DODGE_TICK = 20
 
 # Layout: arrow above first-person sprite zone (ratios of screen height, top-down)
-ARROW_CENTER_Y_RATIO = 0.28
+ARROW_CENTER_Y_RATIO = 0.69
 FP_SPRITE_MAX_HEIGHT_RATIO = 0.38
 FP_SPRITE_BOTTOM_PAD = 12
 
