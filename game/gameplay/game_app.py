@@ -424,7 +424,7 @@ class ShadowBoxingGame:
                 self.ui._edgar_current._speed = speed
         elif edgar.finished() and edgar is not self.ui._edgar_sprites.get("idle"):
             self.ui._edgar_current = self.ui._edgar_sprites.get("idle")
-            self.ui._edgar_current.reset()
+            # self.ui._edgar_current.reset()
             self.ui._edgar_current._speed = 2.0
 
         if now > self.delay_before_game_start and self.delay_before_game_start > 0:

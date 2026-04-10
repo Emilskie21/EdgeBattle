@@ -460,12 +460,12 @@ class UIRenderer:
         frame = current_sprite._frames[current_sprite._idx]
 
         # Resize (change numbers as needed)
-        frame = pygame.transform.scale(frame, (564, 800))
+        frame = pygame.transform.scale(frame, (637, 900))
 
         # Position (example: bottom center like a character)
         r = frame.get_rect()
         r.midbottom = (SCREEN_WIDTH // 2, SCREEN_HEIGHT)
-        r.y += 300
+        r.y += 380
         self.screen.blit(frame, r)
         current_sprite.update(dt_ms)
 
