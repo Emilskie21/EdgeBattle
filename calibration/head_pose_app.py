@@ -19,7 +19,7 @@ from game.gameplay.game_app import ShadowBoxingGame
 class PoseConfig:
     yaw_threshold_deg: float = 10.0
     pitch_threshold_deg: float = 10.0
-    smoothing_window: int = 5
+    smoothing_window: int = 3
     max_pitch_deg: float = 25.0
     max_yaw_deg: float = 35.0
 
@@ -120,7 +120,9 @@ class HeadPoseEstimator:
         )
         dist_matrix = np.zeros((4, 1), dtype=np.float64)
 
-        success, rot_vec, trans_vec = cv2.solvePnP(face_3d_np, face_2d_np, cam_matrix, dist_matrix)
+        success, rot_vec, trans_vec = cv2.solvePnP(
+            face_3d_np, face_2d_np, cam_matrix, dist_matrix, flags=cv2.SOLVEPNP_SQPNP
+        )
         if not success:
             return None
 

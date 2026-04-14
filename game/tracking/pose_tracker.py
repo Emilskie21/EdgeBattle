@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import threading
 import time
 import urllib.request
 from collections import deque
@@ -41,13 +42,13 @@ class PoseTracker:
         self._yaw_threshold_deg = 10.0
         self._pitch_threshold_deg = 10.0
 
-        self._smoothing_window = 5
+        self._smoothing_window = 3
         self._pitch_history: Deque[float] = deque(maxlen=self._smoothing_window)
         self._yaw_history: Deque[float] = deque(maxlen=self._smoothing_window)
 
         # Input stability/cooldown to prevent rapid repeated triggers.
-        self._stable_frames_required = 3
-        self._emit_cooldown_frames = 10
+        self._stable_frames_required = 2
+        self._emit_cooldown_frames = 6
         self._stable_count = 0
         self._pending_dir: Optional[Direction] = None
         self._cooldown_frames = 0
@@ -58,6 +59,13 @@ class PoseTracker:
         self._neutral_yaw = 0.0
         self._calibration_path = self._resolve_calibration_path()
 
+        # Latest raw angles from background capture thread.
+        # Tuple: (camera_ok, detection_ok, pitch_raw, yaw_raw, face_points)
+        self._latest_raw: Optional[Tuple[bool, bool, float, float, Optional[list]]] = None
+        self._raw_lock = threading.Lock()
+        self._stop_capture = threading.Event()
+        self._capture_thread: Optional[threading.Thread] = None
+
         self._cap = None
         self._landmarker = None
         self._mediapipe_ok = self._init_mediapipe()
@@ -65,6 +73,11 @@ class PoseTracker:
         if self._mediapipe_ok:
             self._init_camera()
             self._load_or_seed_calibration()
+            if self._cap is not None:
+                self._capture_thread = threading.Thread(
+                    target=self._capture_loop, daemon=True
+                )
+                self._capture_thread.start()
 
     def _resolve_calibration_path(self) -> Path:
         root = repo_root()
@@ -119,9 +132,10 @@ class PoseTracker:
             # Keep camera_ok False; game will pause progression.
             self._cap = None
             return
+        self._cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
         self._cap.set(cv2.CAP_PROP_FRAME_WIDTH, self._frame_w)
         self._cap.set(cv2.CAP_PROP_FRAME_HEIGHT, self._frame_h)
-        for _ in range(15):
+        for _ in range(5):
             self._cap.read()
 
     def _load_or_seed_calibration(self) -> None:
@@ -196,81 +210,112 @@ class PoseTracker:
         self._cooldown_frames = self._emit_cooldown_frames
         return raw_dir
 
+    def _capture_loop(self) -> None:
+        """Background thread: capture frames and run MediaPipe continuously.
+
+        Results are stored in ``_latest_raw`` so that ``update()`` never
+        blocks on I/O or heavy CPU work in the game loop thread.
+        """
+        import cv2
+        import numpy as np
+
+        landmark_ids = (33, 263, 1, 61, 291, 199)
+
+        while not self._stop_capture.is_set():
+            if self._cap is None:
+                break
+
+            ok, frame_bgr = self._cap.read()
+            if not ok:
+                with self._raw_lock:
+                    self._latest_raw = (False, False, 0.0, 0.0, None)
+                continue
+
+            timestamp_ms = int(time.time() * 1000)
+            frame_bgr = cv2.flip(frame_bgr, 1)
+            rgb = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2RGB)
+            mp_image = self._mp.Image(image_format=self._mp.ImageFormat.SRGB, data=rgb)
+
+            result = self._landmarker.detect_for_video(mp_image, timestamp_ms)
+            if not result.face_landmarks:
+                with self._raw_lock:
+                    self._latest_raw = (True, False, 0.0, 0.0, None)
+                continue
+
+            img_h, img_w = frame_bgr.shape[:2]
+            face_landmarks = result.face_landmarks[0]
+
+            face_2d = []
+            face_3d = []
+            face_points = []
+
+            for idx in landmark_ids:
+                lm = face_landmarks[idx]
+                x_px, y_px = int(lm.x * img_w), int(lm.y * img_h)
+                face_2d.append([x_px, y_px])
+                face_3d.append([x_px, y_px, lm.z])
+                face_points.append((float(x_px), float(y_px)))
+
+            face_2d_np = np.asarray(face_2d, dtype=np.float32).reshape((-1, 2))
+            face_3d_np = np.asarray(face_3d, dtype=np.float32).reshape((-1, 3))
+            if face_2d_np.shape[0] < 4 or face_2d_np.shape[0] != face_3d_np.shape[0]:
+                with self._raw_lock:
+                    self._latest_raw = (True, False, 0.0, 0.0, None)
+                continue
+
+            focal_length = 1.0 * img_w
+            cam_matrix = np.array(
+                [[focal_length, 0, img_h / 2], [0, focal_length, img_w / 2], [0, 0, 1]],
+                dtype=np.float64,
+            )
+            dist_matrix = np.zeros((4, 1), dtype=np.float64)
+
+            try:
+                success, rot_vec, _ = cv2.solvePnP(
+                    face_3d_np,
+                    face_2d_np,
+                    cam_matrix,
+                    dist_matrix,
+                    flags=cv2.SOLVEPNP_SQPNP,
+                )
+            except cv2.error:
+                with self._raw_lock:
+                    self._latest_raw = (True, False, 0.0, 0.0, None)
+                continue
+
+            if not success:
+                with self._raw_lock:
+                    self._latest_raw = (True, False, 0.0, 0.0, None)
+                continue
+
+            rmat, _ = cv2.Rodrigues(rot_vec)
+            angles, *_ = cv2.RQDecomp3x3(rmat)
+            pitch_raw = float(angles[0] * 360)
+            yaw_raw = float(angles[1] * 360)
+
+            with self._raw_lock:
+                self._latest_raw = (True, True, pitch_raw, yaw_raw, face_points)
+
     def update(self) -> PoseTrackingResult:
         if not self._mediapipe_ok or self._landmarker is None:
             return PoseTrackingResult(camera_ok=False, detection_ok=False)
 
-        import cv2
-        import numpy as np
-
         if self._cap is None:
             return PoseTrackingResult(camera_ok=False, detection_ok=False)
 
-        ok, frame_bgr = self._cap.read()
-        if not ok:
+        with self._raw_lock:
+            raw = self._latest_raw
+
+        if raw is None:
+            # Background thread hasn't produced a frame yet.
+            return PoseTrackingResult(camera_ok=True, detection_ok=False)
+
+        camera_ok, detection_ok, pitch_raw, yaw_raw, face_points = raw
+
+        if not camera_ok:
             return PoseTrackingResult(camera_ok=False, detection_ok=False)
-
-        timestamp_ms = int(time.time() * 1000)
-        frame_bgr = cv2.flip(frame_bgr, 1)
-        rgb = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2RGB)
-        mp_image = self._mp.Image(image_format=self._mp.ImageFormat.SRGB, data=rgb)
-
-        result = self._landmarker.detect_for_video(mp_image, timestamp_ms)
-        if not result.face_landmarks:
+        if not detection_ok:
             return PoseTrackingResult(camera_ok=True, detection_ok=False)
-
-        img_h, img_w = frame_bgr.shape[:2]
-        face_landmarks = result.face_landmarks[0]
-
-        # Indices matched to the head-pose code you already prototyped.
-        landmark_ids = (33, 263, 1, 61, 291, 199)
-        face_2d = []
-        face_3d = []
-        nose_xy = None
-
-        face_points = []
-
-        for idx in landmark_ids:
-            lm = face_landmarks[idx]
-            x_px, y_px = int(lm.x * img_w), int(lm.y * img_h)
-            face_2d.append([x_px, y_px])
-            face_3d.append([x_px, y_px, lm.z])
-            face_points.append((float(x_px), float(y_px)))
-            # if idx == 1:
-            #     nose_xy = (float(lm.x * img_w), float(lm.y * img_h))
-
-        # if nose_xy is None:
-        #     return PoseTrackingResult(camera_ok=True, detection_ok=False)
-
-        face_2d_np = np.asarray(face_2d, dtype=np.float32).reshape((-1, 2))
-        face_3d_np = np.asarray(face_3d, dtype=np.float32).reshape((-1, 3))
-        if face_2d_np.shape[0] < 4 or face_2d_np.shape[0] != face_3d_np.shape[0]:
-            return PoseTrackingResult(camera_ok=True, detection_ok=False)
-
-        focal_length = 1.0 * img_w
-        cam_matrix = np.array(
-            [[focal_length, 0, img_h / 2], [0, focal_length, img_w / 2], [0, 0, 1]],
-            dtype=np.float64,
-        )
-        dist_matrix = np.zeros((4, 1), dtype=np.float64)
-
-        try:
-            success, rot_vec, trans_vec = cv2.solvePnP(
-                face_3d_np,
-                face_2d_np,
-                cam_matrix,
-                dist_matrix,
-                flags=cv2.SOLVEPNP_ITERATIVE,
-            )
-        except cv2.error:
-            return PoseTrackingResult(camera_ok=True, detection_ok=False)
-        if not success:
-            return PoseTrackingResult(camera_ok=True, detection_ok=False)
-
-        rmat, _ = cv2.Rodrigues(rot_vec)
-        angles, *_ = cv2.RQDecomp3x3(rmat)
-        pitch_raw = float(angles[0] * 360)
-        yaw_raw = float(angles[1] * 360)
 
         if not self._neutral_calibrated:
             # Seed neutral from the first detected face.
@@ -313,6 +358,10 @@ class PoseTracker:
         )
 
     def __del__(self) -> None:
+        try:
+            self._stop_capture.set()
+        except Exception:
+            pass
         try:
             if self._cap is not None:
                 self._cap.release()
