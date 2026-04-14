@@ -29,12 +29,9 @@
     "crowdcheer": "audio/crowdcheer.mp3",
     "finishbell": "audio/finishbell.mp3",
     "gameover": "audio/gameover.mp3",
-    "punch1": "audio/punch1.mp3",
-    "punch2": "audio/punch2.mp3",
-    "punch3": "audio/punch3.mp3",
-    "punch4": "audio/punch4.mp3",
-    "punch5": "audio/punch5.mp3",
-    "punch6": "audio/punch6.mp3",
+    "hit": "audio/hit.mp3",
+    "counterhit": "audio/counterhit.mp3",
+    "scoremilestone": "audio/Scoremilestone.mp3",
     "takedamage": "audio/takedamage.mp3"
   },
   "music": {

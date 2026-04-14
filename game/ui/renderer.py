@@ -76,6 +76,8 @@ class UIRenderer:
         self.left_hand = "left_idle"
         self.right_hand = "right_idle"
         self._punch_end_ms = 0
+        self._dodge_popup_start_ms = 0
+        self._dodge_popup_duration_ms = 640
         self.loading_icon: GifBackground = pack.get("loading")
         gradients = pack.get("gradient") or {}
         self.side_gradient: pygame.Surface = gradients.get("side")
@@ -105,6 +107,7 @@ class UIRenderer:
         game_over_row_id: int = 0,
         show_debug: bool = False,
         debug_lines: list[str] | None = None,
+        dodge_popup_started_ms: int = 0,
     ) -> None:
         if game_state in (GameState.PLAYING, GameState.COUNTDOWN, GameState.GAME_OVER):
             if self._game_bg:
@@ -135,6 +138,7 @@ class UIRenderer:
             self.draw_loading(dt_ms)
         elif game_state == GameState.PLAYING:
             self._draw_hud(stats, high_score)
+            self._draw_dodge_popup(dodge_popup_started_ms)
             self._draw_edgar(self._edgar_current, dt_ms)
             self._draw_arrow_prompt(
                 current_arrow,
@@ -162,6 +166,33 @@ class UIRenderer:
             self._draw_debug(debug_lines or [])
 
         pygame.display.flip()
+
+    def _draw_text_outline(
+        self,
+        font: pygame.font.Font,
+        text: str,
+        x: int,
+        y: int,
+        color: tuple[int, int, int],
+        outline_color=(0, 0, 0),
+        thickness: int = 2,
+        align_right: bool = False,
+    ):
+        base = font.render(text, True, color)
+
+        if align_right:
+            x = x - base.get_width()
+
+        # Draw outline
+        for dx in range(-thickness, thickness + 1):
+            for dy in range(-thickness, thickness + 1):
+                if dx == 0 and dy == 0:
+                    continue
+                outline = font.render(text, True, outline_color)
+                self.screen.blit(outline, (x + dx, y + dy))
+
+        # Draw main text
+        self.screen.blit(base, (x, y))
 
     def _draw_text_center(self, text: str, y: int, font: pygame.font.Font, color: tuple[int, int, int]) -> None:
         surface = font.render(text, True, color)
@@ -199,11 +230,44 @@ class UIRenderer:
         # sc = self.small_font.render(f"SCORE  {stats.score:06d}", True, self.muted)
         # self.screen.blit(sc, (pad_x, y + 36))
 
-        hi = self.small_font.render(f"HIGH  {high_score:06d}", True, self.white)
-        self.screen.blit(hi, (SCREEN_WIDTH - hi.get_width() - pad_x, y))
+        self._draw_text_outline(
+            self.small_font,
+            f"HIGH  {high_score:06d}",
+            SCREEN_WIDTH - pad_x,
+            y,
+            self.white,
+            thickness=3,
+            align_right=True
+        )
 
-        sc = self.small_font.render(f"SCORE  {stats.score:06d}", True, self.accent)
-        self.screen.blit(sc, (SCREEN_WIDTH - sc.get_width() - pad_x, y + 26))
+        self._draw_text_outline(
+            self.small_font,
+            f"SCORE  {stats.score:06d}",
+            SCREEN_WIDTH - pad_x,
+            y + 26,
+            self.accent,
+            thickness=3,
+            align_right=True
+        )
+
+    def _draw_dodge_popup(self, dodge_popup_started_ms: int) -> None:
+        if dodge_popup_started_ms <= 0:
+            return
+        now = pygame.time.get_ticks()
+        elapsed = now - dodge_popup_started_ms
+        if elapsed < 0 or elapsed > self._dodge_popup_duration_ms:
+            return
+
+        progress = max(0.0, min(1.0, elapsed / float(self._dodge_popup_duration_ms)))
+        alpha = int(255 * (1.0 - progress))
+        rise_px = int(26 * progress)
+        x = SCREEN_WIDTH - 16
+        y = 44 - rise_px
+
+        popup = self.small_font.render("+20", True, (255, 228, 130))
+        popup.set_alpha(alpha)
+        w = popup.get_width()
+        self.screen.blit(popup, (x - w, y))
 
     def _draw_fp_sprites(self) -> None:
         bottom = SCREEN_HEIGHT - FP_SPRITE_BOTTOM_PAD
@@ -475,7 +539,7 @@ class UIRenderer:
         
         frame = self.loading_icon._frames[self.loading_icon._idx]
 
-        pad = 20
+        pad = 10
         self.loading_icon.update(dt_ms)
         nw = int(frame.get_width() * 0.03)
         nh = int(frame.get_height() * 0.06)
