@@ -1,17 +1,16 @@
-Dear Curien Del Rosario, suisei is the name of my dog
+Nigga luke NIgga curien
 
-Dear Lumakin Luke, You're a bitchass hoe.
+main updates 
 
-hoy monggoloyd curien eto run mo:
+leaderboard screen - nagrereset kapag closed yung buong program
 
-python -m venv .venv
-.\.venv\Scripts\Activate.ps1
-python -m pip install --upgrade pip
-python -m pip install -r requirements.txt
+need na updates: 
 
-so far, ang progress namin yung stitching ng bg assets and nung game logic medyo halfway, ikaw na tumingin and assess, pero yung sa gif background (assets folder) hindi gumagana at nagimprovise ai sa health bar. pm mo kami sa gc ni emil kung ano magiging progress mo rito. 
+sprite ni edgar hindi parin naaayos
 
+hindi parin sabay yung arrow sa suntok ng asset > nakalagay na sa code pero di nakikita ingame
 
- btw run mo na lang yung:
- python main.py file andyan na lahat
+add ng bgm yung nasend sa isang drive sa gc
+
+need izoom onti yung background 
 

@@ -7,7 +7,7 @@ from typing import Any
 
 import pygame
 
-from game.constants import SCREEN_HEIGHT, SCREEN_WIDTH
+from game.constants import FP_SPRITE_MAX_HEIGHT_RATIO, SCREEN_HEIGHT, SCREEN_WIDTH
 from game.ui.animated_background import load_background_from_path
 from game.ui.assets_manifest import load_manifest, resolve_asset
 
@@ -20,7 +20,6 @@ def _load_raster(path: Path) -> pygame.Surface | None:
     except (pygame.error, OSError):
         return None
 
-
 def load_packaged_surfaces() -> dict[str, Any]:
     """Returns keys: menu_static, game_bg, arrow_base, punch, hp_by_value, sprites_fp."""
     m = load_manifest()
@@ -30,7 +29,13 @@ def load_packaged_surfaces() -> dict[str, Any]:
         "arrow_base": None,
         "punch": None,
         "hp_by_value": {},
-        "sprites_fp": {},
+        "sprites_edgar": {},
+        "sprites_player": {},
+        "instructions": None,
+        "music": {},
+        "sound": {},
+        "loading": None,
+        "gradient": {}
     }
     if not m:
         return out
@@ -46,6 +51,13 @@ def load_packaged_surfaces() -> dict[str, Any]:
     else:
         out["game_bg"] = None
 
+    game_rel = m.get("instructions")
+    if isinstance(game_rel, str):
+        instr = load_background_from_path(resolve_asset(game_rel))
+        out["instructions"] = instr
+    else:
+        out["instructions"] = None
+
     arrow_rel = m.get("arrow")
     if isinstance(arrow_rel, str):
         out["arrow_base"] = _load_raster(resolve_asset(arrow_rel))
@@ -56,21 +68,66 @@ def load_packaged_surfaces() -> dict[str, Any]:
 
     health = m.get("health")
     if isinstance(health, dict):
-        for key in ("3", "2", "1"):
+        for key in ("3", "2", "1", "0"):
             rel = health.get(key)
             if isinstance(rel, str):
                 surf = _load_raster(resolve_asset(rel))
                 if surf is not None:
                     out["hp_by_value"][int(key)] = surf
 
-    sp = m.get("sprites_firstperson")
-    if isinstance(sp, dict):
-        for side in ("left", "right"):
-            rel = sp.get(side)
+    edgar = m.get("edgar")
+    if isinstance(edgar, dict):
+        # target_h = int(SCREEN_HEIGHT * FP_SPRITE_MAX_HEIGHT_RATIO)
+        for move in ("idle", "jab", "left_hook", "right_hook", "uppercut"):
+            rel = edgar.get(move)
             if isinstance(rel, str):
-                surf = _load_raster(resolve_asset(rel))
-                if surf is not None:
-                    out["sprites_fp"][side] = surf
+                # anim = load_sprite_gif(resolve_asset(rel), target_h=target_h)
+                if move is not "idle":
+                    anim = load_background_from_path(resolve_asset(rel), True)
+                else:
+                    anim = load_background_from_path(resolve_asset(rel), False)
+                if anim is not None:
+                    out["sprites_edgar"][move] = anim
+
+    player = m.get("player")
+    if isinstance(player, dict):
+        target_h = int(SCREEN_HEIGHT * FP_SPRITE_MAX_HEIGHT_RATIO)
+        for move in ("left_idle", "left_punch", "left_hook", "right_idle", "right_punch"):
+            rel = player.get(move)
+            if isinstance(rel, str):
+                anim = _load_raster(resolve_asset(rel))
+                if anim is not None:
+                    out["sprites_player"][move] = anim
+
+    sounds = m.get("sounds")
+    if isinstance(sounds, dict):
+        for name, rel in sounds.items():
+            if isinstance(rel, str):
+                snd = _load_audio(resolve_asset(rel))
+                if snd is not None:
+                    out["sound"][name] = snd
+
+    music = m.get("music")
+    if isinstance(music, dict):
+        for name, rel in music.items():
+            if isinstance(rel, str):
+                mus = _load_music(resolve_asset(rel))
+                if mus is not None:
+                    out["music"][name] = mus
+
+    load = m.get("loading")
+    if isinstance(load, str):
+        loa = load_background_from_path(resolve_asset(load))
+        if loa is not None:
+            out["loading"] = loa
+
+    gradi = m.get("gradient")
+    if isinstance(gradi, dict):
+        for name, rel in gradi.items():
+            if isinstance(rel, str):
+                gra = _load_raster(resolve_asset(rel))
+                if gra is not None:
+                    out["gradient"][name] = gra
 
     return out
 
@@ -101,3 +158,20 @@ def arrow_for_direction(base: pygame.Surface, direction: object) -> pygame.Surfa
         Direction.DOWN: -90,
     }
     return pygame.transform.rotate(base, deg[direction])
+
+def _load_audio(path: Path) -> pygame.mixer.Sound | None:
+    if not path.is_file():
+        return None
+    try:
+        return pygame.mixer.Sound(str(path))
+    except (pygame.error, OSError):
+        return None
+    
+def _load_music(path: Path) -> str | None:
+    if not path.is_file():
+        return None
+    try:
+        # pygame.mixer.music loads by filename when played
+        return str(path)
+    except (pygame.error, OSError):
+        return None
