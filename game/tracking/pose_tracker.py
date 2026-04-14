@@ -35,20 +35,22 @@ class PoseTracker:
 
     def __init__(self) -> None:
         self._camera_index = 0
-        self._frame_w = 640
-        self._frame_h = 480
+        # Low-latency capture profile: prioritize fresh frames over detail.
+        self._frame_w = 320
+        self._frame_h = 240
+        self._target_fps = 60
 
         # Thresholds (degrees) tuned to match the standalone head pose script.
         self._yaw_threshold_deg = 10.0
         self._pitch_threshold_deg = 10.0
 
-        self._smoothing_window = 3
+        self._smoothing_window = 1
         self._pitch_history: Deque[float] = deque(maxlen=self._smoothing_window)
         self._yaw_history: Deque[float] = deque(maxlen=self._smoothing_window)
 
         # Input stability/cooldown to prevent rapid repeated triggers.
-        self._stable_frames_required = 2
-        self._emit_cooldown_frames = 5
+        self._stable_frames_required = 1
+        self._emit_cooldown_frames = 2
         self._stable_count = 0
         self._pending_dir: Optional[Direction] = None
         self._cooldown_frames = 0
@@ -135,6 +137,7 @@ class PoseTracker:
         self._cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
         self._cap.set(cv2.CAP_PROP_FRAME_WIDTH, self._frame_w)
         self._cap.set(cv2.CAP_PROP_FRAME_HEIGHT, self._frame_h)
+        self._cap.set(cv2.CAP_PROP_FPS, self._target_fps)
         for _ in range(5):
             self._cap.read()
 
@@ -221,7 +224,7 @@ class PoseTracker:
 
         landmark_ids = (33, 263, 1, 61, 291, 199)
 
-        pnp_flag = getattr(cv2, "SOLVEPNP_SQPNP", cv2.SOLVEPNP_ITERATIVE)
+        pnp_flag = getattr(cv2, "SOLVEPNP_EPNP", cv2.SOLVEPNP_ITERATIVE)
 
         while not self._stop_capture.is_set():
             if self._cap is None:
