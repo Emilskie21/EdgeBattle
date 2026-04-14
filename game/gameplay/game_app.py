@@ -324,7 +324,7 @@ class ShadowBoxingGame:
         if state == GameState.INSTRUCTIONS:
             elapsed = now - self._countdown_start_ms
             self._countdown_value = max(0, 3 - int(elapsed / 1000))
-            self.play_music("guideline")
+            self.play_music("guideline", 0.2)
 
             if elapsed >= 11000:
                 self.state_machine.transition_to(GameState.COUNTDOWN)

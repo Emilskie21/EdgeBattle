@@ -475,7 +475,7 @@ class UIRenderer:
         
         frame = self.loading_icon._frames[self.loading_icon._idx]
 
-        pad = 10
+        pad = 20
         self.loading_icon.update(dt_ms)
         nw = int(frame.get_width() * 0.03)
         nh = int(frame.get_height() * 0.06)
