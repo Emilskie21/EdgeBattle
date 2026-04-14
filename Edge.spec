@@ -10,18 +10,32 @@ a = Analysis(
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
-    excludes=[],
+    excludes=[
+        'torch',
+        'torchvision',
+        'torchaudio',
+        'tensorflow',
+        'tensorflow_estimator',
+        'keras',
+        'pandas',
+        'matplotlib',
+        'scipy',
+        'sklearn',
+        'IPython',
+        'jupyter',
+        'notebook',
+        'pytest',
+    ],
     noarchive=False,
-    optimize=0,
+    optimize=1,
 )
 pyz = PYZ(a.pure)
 
 exe = EXE(
     pyz,
     a.scripts,
-    a.binaries,
-    a.datas,
     [],
+    exclude_binaries=True,
     name='Edge',
     debug=False,
     bootloader_ignore_signals=False,
@@ -35,4 +49,13 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
+)
+coll = COLLECT(
+    exe,
+    a.binaries,
+    a.datas,
+    strip=False,
+    upx=True,
+    upx_exclude=[],
+    name='Edge',
 )

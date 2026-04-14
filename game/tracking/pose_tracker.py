@@ -48,11 +48,7 @@ class PoseTracker:
 
         # Input stability/cooldown to prevent rapid repeated triggers.
         self._stable_frames_required = 2
-<<<<<<< HEAD
         self._emit_cooldown_frames = 5
-=======
-        self._emit_cooldown_frames = 6
->>>>>>> origin/copilot/identify-in-game-files
         self._stable_count = 0
         self._pending_dir: Optional[Direction] = None
         self._cooldown_frames = 0
@@ -139,10 +135,6 @@ class PoseTracker:
         self._cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
         self._cap.set(cv2.CAP_PROP_FRAME_WIDTH, self._frame_w)
         self._cap.set(cv2.CAP_PROP_FRAME_HEIGHT, self._frame_h)
-<<<<<<< HEAD
-        self._cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
-=======
->>>>>>> origin/copilot/identify-in-game-files
         for _ in range(5):
             self._cap.read()
 
@@ -229,6 +221,8 @@ class PoseTracker:
 
         landmark_ids = (33, 263, 1, 61, 291, 199)
 
+        pnp_flag = getattr(cv2, "SOLVEPNP_SQPNP", cv2.SOLVEPNP_ITERATIVE)
+
         while not self._stop_capture.is_set():
             if self._cap is None:
                 break
@@ -284,7 +278,7 @@ class PoseTracker:
                     face_2d_np,
                     cam_matrix,
                     dist_matrix,
-                    flags=cv2.SOLVEPNP_SQPNP,
+                    flags=pnp_flag,
                 )
             except cv2.error:
                 with self._raw_lock:
@@ -325,62 +319,6 @@ class PoseTracker:
         if not detection_ok:
             return PoseTrackingResult(camera_ok=True, detection_ok=False)
 
-<<<<<<< HEAD
-        img_h, img_w = frame_bgr.shape[:2]
-        face_landmarks = result.face_landmarks[0]
-
-        # Indices matched to the head-pose code you already prototyped.
-        landmark_ids = (33, 263, 1, 61, 291, 199)
-        face_2d = []
-        face_3d = []
-        nose_xy = None
-
-        face_points = []
-
-        for idx in landmark_ids:
-            lm = face_landmarks[idx]
-            x_px, y_px = int(lm.x * img_w), int(lm.y * img_h)
-            face_2d.append([x_px, y_px])
-            face_3d.append([x_px, y_px, lm.z])
-            face_points.append((float(x_px), float(y_px)))
-            # if idx == 1:
-            #     nose_xy = (float(lm.x * img_w), float(lm.y * img_h))
-
-        # if nose_xy is None:
-        #     return PoseTrackingResult(camera_ok=True, detection_ok=False)
-
-        face_2d_np = np.asarray(face_2d, dtype=np.float32).reshape((-1, 2))
-        face_3d_np = np.asarray(face_3d, dtype=np.float32).reshape((-1, 3))
-        if face_2d_np.shape[0] < 4 or face_2d_np.shape[0] != face_3d_np.shape[0]:
-            return PoseTrackingResult(camera_ok=True, detection_ok=False)
-
-        focal_length = 1.0 * img_w
-        cam_matrix = np.array(
-            [[focal_length, 0, img_h / 2], [0, focal_length, img_w / 2], [0, 0, 1]],
-            dtype=np.float64,
-        )
-        dist_matrix = np.zeros((4, 1), dtype=np.float64)
-
-        try:
-            success, rot_vec, trans_vec = cv2.solvePnP(
-                face_3d_np,
-                face_2d_np,
-                cam_matrix,
-                dist_matrix,
-                flags=cv2.SOLVEPNP_SQPNP,
-            )
-        except cv2.error:
-            return PoseTrackingResult(camera_ok=True, detection_ok=False)
-        if not success:
-            return PoseTrackingResult(camera_ok=True, detection_ok=False)
-
-        rmat, _ = cv2.Rodrigues(rot_vec)
-        angles, *_ = cv2.RQDecomp3x3(rmat)
-        pitch_raw = float(angles[0] * 360)
-        yaw_raw = float(angles[1] * 360)
-
-=======
->>>>>>> origin/copilot/identify-in-game-files
         if not self._neutral_calibrated:
             # Seed neutral from the first detected face.
             self._neutral_pitch = pitch_raw
