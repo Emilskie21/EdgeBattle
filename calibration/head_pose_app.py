@@ -121,11 +121,15 @@ class HeadPoseEstimator:
         dist_matrix = np.zeros((4, 1), dtype=np.float64)
 
         success, rot_vec, trans_vec = cv2.solvePnP(
+<<<<<<< HEAD
             face_3d_np,
             face_2d_np,
             cam_matrix,
             dist_matrix,
             flags=cv2.SOLVEPNP_SQPNP,
+=======
+            face_3d_np, face_2d_np, cam_matrix, dist_matrix, flags=cv2.SOLVEPNP_SQPNP
+>>>>>>> origin/copilot/identify-in-game-files
         )
         if not success:
             return None
