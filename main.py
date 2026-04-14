@@ -19,7 +19,6 @@ def main() -> None:
         pass
     else:
         from calibration.head_pose_app import run as run_calibration
-
         if not run_calibration():
             print("Calibration did not finish. Run again when ready.")
             sys.exit(1)

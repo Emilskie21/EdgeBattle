@@ -1,31 +1,20 @@
 # -*- mode: python ; coding: utf-8 -*-
 
+from PyInstaller.utils.hooks import collect_data_files, collect_dynamic_libs
+
+mp_datas = collect_data_files('mediapipe')
+mp_binaries = collect_dynamic_libs('mediapipe')
 
 a = Analysis(
     ['main.py'],
     pathex=[],
-    binaries=[],
-    datas=[('assets', 'assets'), ('data', 'data')],
+    binaries=mp_binaries,
+    datas=[('assets', 'assets'), ('data', 'data')] + mp_datas,
     hiddenimports=[],
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
-    excludes=[
-        'torch',
-        'torchvision',
-        'torchaudio',
-        'tensorflow',
-        'tensorflow_estimator',
-        'keras',
-        'pandas',
-        'matplotlib',
-        'scipy',
-        'sklearn',
-        'IPython',
-        'jupyter',
-        'notebook',
-        'pytest',
-    ],
+    excludes=[],
     noarchive=False,
     optimize=1,
 )

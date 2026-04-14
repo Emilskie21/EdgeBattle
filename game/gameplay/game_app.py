@@ -170,7 +170,6 @@ class ShadowBoxingGame:
         pygame.quit()
         try:
             from calibration.head_pose_app import run as cal_run
-
             cal_run()
         finally:
             pygame.init()
