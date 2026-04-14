@@ -41,13 +41,13 @@ class PoseTracker:
         self._yaw_threshold_deg = 10.0
         self._pitch_threshold_deg = 10.0
 
-        self._smoothing_window = 5
+        self._smoothing_window = 3
         self._pitch_history: Deque[float] = deque(maxlen=self._smoothing_window)
         self._yaw_history: Deque[float] = deque(maxlen=self._smoothing_window)
 
         # Input stability/cooldown to prevent rapid repeated triggers.
-        self._stable_frames_required = 3
-        self._emit_cooldown_frames = 10
+        self._stable_frames_required = 2
+        self._emit_cooldown_frames = 5
         self._stable_count = 0
         self._pending_dir: Optional[Direction] = None
         self._cooldown_frames = 0
@@ -121,7 +121,8 @@ class PoseTracker:
             return
         self._cap.set(cv2.CAP_PROP_FRAME_WIDTH, self._frame_w)
         self._cap.set(cv2.CAP_PROP_FRAME_HEIGHT, self._frame_h)
-        for _ in range(15):
+        self._cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+        for _ in range(5):
             self._cap.read()
 
     def _load_or_seed_calibration(self) -> None:
@@ -260,7 +261,7 @@ class PoseTracker:
                 face_2d_np,
                 cam_matrix,
                 dist_matrix,
-                flags=cv2.SOLVEPNP_ITERATIVE,
+                flags=cv2.SOLVEPNP_SQPNP,
             )
         except cv2.error:
             return PoseTrackingResult(camera_ok=True, detection_ok=False)
